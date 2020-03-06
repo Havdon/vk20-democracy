@@ -700,7 +700,10 @@
     const ELECTION_PROCESS_LENGTH = 2; 
     const TIME_BETWEEN_ELECTIONS = 4;
 
-    const CITIZEN_PADDING = 3;
+    const SPEED_LIMIT = 0.1;
+    const AIR_FRICTION = 0.95;
+
+    const CITIZEN_PADDING = 5;
     const VELOCITY_HISTORY_LENGTH = 10;
     const STILLNESS_LIMIT = 0.1;
 
@@ -718,13 +721,17 @@
             this.velocity = new Vec2();
             this.opinions = opinions;
             this.clusterId = clusterId;
-            this.radius = 5; //+ Math.random() * 10;
+            this.radius = 5;
 
-            this.k = 0.9;
+            this.k = 0.5;
             this.velocities = [];
             
             this.isAtRest = false;
             this.secondsAtRest = 0;
+        }
+
+        static getElectedFullRadius() {
+            return CITIZEN_RADIUS * ELECTED_RADIUS_MULTIPLIER + CITIZEN_PADDING;
         }
 
         isNormal() {
@@ -749,11 +756,15 @@
             this.isAtRest = this.secondsAtRest > 2;
 
             this.prevPosition = this.position.copy;
+
+            if (this.velocity.sqlength > SPEED_LIMIT * SPEED_LIMIT) {
+                this.velocity.setMag(SPEED_LIMIT);
+            }
             
             this.position.add(Vec2.mult(this.velocity, dt));
 
             //this.velocity = new Vec2();
-            this.velocity.mult(0.8);
+            this.velocity.mult(AIR_FRICTION);
 
             switch(this.state) {
                 case STATE_NORMAL:
@@ -789,8 +800,8 @@
             let dist = diff.length;
             this.velocity.sub(
                 new Vec2(
-                diff.x * 0.00001 * (dist > cluster.radius ? 1.0 : dist / cluster.radius) * dt,
-                diff.y * 0.00001 * (dist > cluster.radius ? 1.0 : dist / cluster.radius) * dt
+                diff.x * 0.000001 * (dist > cluster.radius ? 1.0 : dist / cluster.radius) * dt,
+                diff.y * 0.000001 * (dist > cluster.radius ? 1.0 : dist / cluster.radius) * dt
                 )
             );
             this.mass = dist;
@@ -806,35 +817,55 @@
             if (this.electionTimer >= ELECTION_PROCESS_LENGTH) {
                 this.radius = CITIZEN_RADIUS * ELECTED_RADIUS_MULTIPLIER;
                 this.state = STATE_ELECTED;
+                this.seat = cluster.seats.splice(0, 1)[0];
                 cluster.beingElectedCount--;
             }
         }
 
         updateElected(simulation, dt) {
-            this.position.y += 25 * (dt / 1000);
-            this.mass = 10000;
+
+            let dir = Vec2.sub(this.seat, this.position);
+            let dist = dir.length;
+            if (dist < 5) {
+                this.mass = 1;
+            }
+            else {
+                this.mass = 10000;
+            }
+            if (dist > 3) {
+                dir.setMag(1);
+                dir.mult(0.1 * dt / 1000);
+
+                this.velocity.add(dir);
+            }
+            
         }
 
         // Avoids citizens of other clusters.
         static avoid(citizenA, citizenB) {
-            let oneIsElected = (!citizenA.isNormal() || !citizenB.isNormal()) && citizenA.isNormal() != citizenB.isNormal();
-            if (citizenA.clusterId == citizenB.clusterId) return;
+            //let oneIsElected = (!citizenA.isNormal() || !citizenB.isNormal()) && citizenA.isNormal() != citizenB.isNormal();
+           // if (citizenA.clusterId == citizenB.clusterId) return;
             let diff = Vec2.sub(citizenA.position, citizenB.position);
             let distSqrt = diff.sqlength;
-            let radius = citizenA.radius + citizenB.radius + CITIZEN_PADDING * 2;
+            let radius = citizenA.radius + citizenB.radius + CITIZEN_PADDING;
             if (distSqrt > radius * radius) return;
             let overlap = diff.length - radius;
             let m1 = citizenA.mass;//citizenA.radius * citizenA.radius * Math.PI;
             let m2 = citizenB.mass;//citizenB.radius * citizenB.radius * Math.PI;
-
-
-            diff.setMag(1);
-            diff.mult((overlap * m2) / (m1 + m2) * 0.1);
-            citizenA.velocity.sub(diff);
             
             diff.setMag(1);
-            diff.mult((-overlap * m1) / (m1 + m2) * 0.1);
-            citizenB.velocity.add(diff);
+            let dot1 = Vec2.dot(diff, citizenA.velocity);
+            if (dot1 >= 0) {
+                diff.mult(dot1);
+                citizenA.velocity.add(diff);
+            }
+
+            diff.setMag(1);
+            let dot2 = Vec2.dot(diff, citizenB.velocity);
+            if (dot2 >= 0) {
+                diff.mult(dot2);
+                citizenB.velocity.sub(diff);
+            }
 
         }
 
@@ -842,10 +873,12 @@
             let diff = Vec2.sub(citizenA.position, citizenB.position);
             let distSqrt = diff.sqlength;
             let radius = citizenA.radius + citizenB.radius + CITIZEN_PADDING;
-            if (distSqrt > radius * radius) return;
+            if (distSqrt > radius * radius) return false;
 
-            let m1 = citizenA.mass;//citizenA.radius * citizenA.radius * Math.PI;
-            let m2 = citizenB.mass;//citizenB.radius * citizenB.radius * Math.PI;
+            let m1 = citizenA.mass;
+            let m2 = citizenB.mass;
+            let im1 = 1 / citizenA.mass;
+            let im2 = 1 / citizenB.mass;
             let k = (citizenA.k + citizenB.k) / 2;
 
             let dist = Math.sqrt(distSqrt);
@@ -865,32 +898,21 @@
             
             citizenA.position = cp1;
             citizenB.position = cp2;
-
-            if (Vec2.dot(diff, Vec2.sub(citizenA.velocity, citizenB.velocity)) < 0) return;
+            
+            let vdot = Vec2.dot(diff, Vec2.sub(citizenA.velocity, citizenB.velocity));
+            if (vdot < 0) return;
 
             diff.setMag(1);
-
-            let vel1Perpendicular = Vec2.dot(diff, citizenA.velocity);
-            let vel2Perpendicular = Vec2.dot(diff, citizenB.velocity);
-
-            // Calculate the new perpendicular velocities
-            let u1Perpendicular =
-                (1 + k) *
-                    ((m1 * vel1Perpendicular + m2 * vel2Perpendicular) / (m1 + m2)) -
-                k * vel1Perpendicular;
-            let u2Perpendicular =
-                (1 + k) *
-                    ((m1 * vel1Perpendicular + m2 * vel2Perpendicular) / (m1 + m2)) -
-                k * vel2Perpendicular;
-
+            let i = (-(1.0 + k) * vdot) / (im1 + im2);
+            let impulse = Vec2.mult(diff, i);
+            citizenA.velocity.add(Vec2.mult(impulse, im1));
+            citizenB.velocity.sub(Vec2.mult(impulse, im2));
             
-            citizenA.velocity = Vec2.mult(diff, u1Perpendicular);
-            citizenB.velocity = Vec2.mult(diff, u2Perpendicular);
         }
 
     }
 
-    const POPULATION_SIZE = 200;
+    const POPULATION_SIZE = 300;
     const CITIZENS_PER_REP = 10;
 
     const OPINION_COUNT = 5;
@@ -899,6 +921,8 @@
 
     const CITIZEN_RADIUS$1 = 5;
     const CITIZEN_PADDING$1 = 3;
+
+    const PARLIAMENT_SPACING = 5;
 
     function initSimulation(canvas) {
 
@@ -954,8 +978,20 @@
 
         const simulation = {
             citizens,
-            clusters
+            clusters,
+            parliament: {
+                position: new Vec2(window.innerWidth / 2, window.innerHeight / 2 + 200),
+                radius: 60
+            }
         };
+
+        simulation.parliament.seats = createSeatingOrder(simulation);
+        let ix = 0;
+        for (var i = 0; i < clusters.length; i++) {
+            const cluster = clusters[i];
+            cluster.seats = simulation.parliament.seats.slice(ix, ix + cluster.representativeMaxCount);
+            ix += cluster.representativeMaxCount;
+        }
 
         startUpdateLoop(dt => update(simulation, dt), () => render(canvas, ctx, simulation));    
     }
@@ -990,6 +1026,7 @@
             clusters[i].timeSinceElection += dt / 1000;
         }
 
+        
         for (var i = 0; i < citizens.length; i++) {
             let citizen = citizens[i];
             var elements = quadTree.retrieve({
@@ -1001,8 +1038,8 @@
             for (var j = 0; j < elements.length; j++) {
                 let other = elements[j].citizen;
                 if (other != citizen && other.index > i) {
+                    //Citizen.avoid(citizen, other);
                     Citizen.collide(citizen, other);
-                    Citizen.avoid(citizen, other);
                 }
             }
             if (citizen.isAtRest) {
@@ -1010,19 +1047,21 @@
                     clusters[citizen.clusterId].restCount++;
             }
         }
+
     }
 
+    const COLORS = ["blue", "red", "green", "orange", "purple"];
     function render(canvas, ctx, simulation) {
-        const { citizens, clusters } = simulation;
+        const { citizens, clusters, parliament } = simulation;
 
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+        ctx.font = "12px Arial";
 
         citizens.forEach(({ position, clusterId, radius, col, ...citizen }) => {
             ctx.beginPath();
             ctx.arc(position.x, position.y, radius, 0, 2 * Math.PI);
-            ctx.fillStyle = ["blue", "red", "green", "yellow", "purple"][clusterId];
+            ctx.fillStyle = COLORS[clusterId];
             /*if (citizen.isAtRest) {
                 ctx.fillStyle = citizen.secondsAtRest > 5 ? 'gold' : "black"
             }*/
@@ -1037,6 +1076,17 @@
             */
         });
     /*
+        ctx.beginPath();
+        ctx.arc(parliament.position.x, parliament.position.y, parliament.radius, 0, 2 * Math.PI);
+        ctx.fillStyle = "black"
+        ctx.stroke();*/
+
+        
+
+        
+        
+        
+    /*
         clusters.forEach(({ x, y, radius }, i) => {
             ctx.beginPath();
             ctx.arc(x, y, radius, 0, 2 * Math.PI);
@@ -1044,6 +1094,64 @@
             ctx.stroke();
         });*/
         
+    }
+
+    function createSeatingOrder(simulation) {
+        const { parliament } = simulation;
+        const electedRadius = Citizen.getElectedFullRadius();
+
+        let targetSeatCount = Math.round(POPULATION_SIZE / CITIZENS_PER_REP);
+
+        let seatPositions = [];
+        let level = 0;
+        let seats = 0;
+        let levelRadius = parliament.radius;
+        while(true) {
+            if (level > 10) break;
+            let minAngle = -150;
+            let maxAngle = -30;
+            let angleDiff = maxAngle - minAngle;
+            let angleSpacing = (electedRadius * 2 + PARLIAMENT_SPACING) / (Math.PI * levelRadius) * 180;
+            let seatCount = Math.floor(angleDiff / angleSpacing);
+            
+            if (seats + seatCount > targetSeatCount) {
+                let diff = targetSeatCount - (seats + seatCount);
+                minAngle -= (Math.round(diff / 2) - 1) * angleSpacing;
+            }
+            
+            for (var i = 0; i < seatCount + 1; i++) {
+                if (seats > targetSeatCount) break;
+                seats++;
+                let angle = (minAngle + i * angleSpacing);
+                let x = levelRadius * Math.cos(angle * Math.PI / 180);
+                let y = levelRadius * Math.sin(angle * Math.PI / 180);
+                seatPositions.push(new Vec2(parliament.position.x + x, parliament.position.y + y));
+            }
+            if (seats > targetSeatCount) break;
+            level++;
+            levelRadius += electedRadius * 2 + PARLIAMENT_SPACING;
+        }
+
+        seatPositions.sort((a, b) => {
+            let diff = Vec2.sub(a, parliament.position);
+            let aDist = diff.length;
+            diff.setMag(1);
+            let angleA = diff.heading * 57.2958;
+
+            diff = Vec2.sub(b, parliament.position);
+            let bDist = diff.length;
+            diff.setMag(1);
+            let angleB = diff.heading * 57.2958;
+            let angleDiff = angleA - angleB;
+            if (Math.abs(angleDiff) < 10) {
+                return aDist - bDist;
+            }
+            else {
+                return angleDiff;
+            }
+        });
+
+        return seatPositions;
     }
 
     function handleOnLoad() {

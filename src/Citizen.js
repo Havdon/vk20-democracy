@@ -7,7 +7,10 @@ const ELECTED_RADIUS_MULTIPLIER = 1.75;
 const ELECTION_PROCESS_LENGTH = 2; 
 const TIME_BETWEEN_ELECTIONS = 4;
 
-const CITIZEN_PADDING = 3;
+const SPEED_LIMIT = 0.1;
+const AIR_FRICTION = 0.95;
+
+const CITIZEN_PADDING = 5;
 const VELOCITY_HISTORY_LENGTH = 10;
 const STILLNESS_LIMIT = 0.1;
 
@@ -25,13 +28,17 @@ export default class Citizen {
         this.velocity = new Vec2();
         this.opinions = opinions;
         this.clusterId = clusterId;
-        this.radius = 5; //+ Math.random() * 10;
+        this.radius = 5;
 
-        this.k = 0.9;
+        this.k = 0.5;
         this.velocities = [];
         
         this.isAtRest = false;
         this.secondsAtRest = 0;
+    }
+
+    static getElectedFullRadius() {
+        return CITIZEN_RADIUS * ELECTED_RADIUS_MULTIPLIER + CITIZEN_PADDING;
     }
 
     isNormal() {
@@ -56,11 +63,15 @@ export default class Citizen {
         this.isAtRest = this.secondsAtRest > 2;
 
         this.prevPosition = this.position.copy;
+
+        if (this.velocity.sqlength > SPEED_LIMIT * SPEED_LIMIT) {
+            this.velocity.setMag(SPEED_LIMIT);
+        }
         
         this.position.add(Vec2.mult(this.velocity, dt));
 
         //this.velocity = new Vec2();
-        this.velocity.mult(0.8);
+        this.velocity.mult(AIR_FRICTION);
 
         switch(this.state) {
             case STATE_NORMAL:
@@ -96,8 +107,8 @@ export default class Citizen {
         let dist = diff.length;
         this.velocity.sub(
             new Vec2(
-            diff.x * 0.00001 * (dist > cluster.radius ? 1.0 : dist / cluster.radius) * dt,
-            diff.y * 0.00001 * (dist > cluster.radius ? 1.0 : dist / cluster.radius) * dt
+            diff.x * 0.000001 * (dist > cluster.radius ? 1.0 : dist / cluster.radius) * dt,
+            diff.y * 0.000001 * (dist > cluster.radius ? 1.0 : dist / cluster.radius) * dt
             )
         )
         this.mass = dist;
@@ -114,35 +125,56 @@ export default class Citizen {
         if (this.electionTimer >= ELECTION_PROCESS_LENGTH) {
             this.radius = CITIZEN_RADIUS * ELECTED_RADIUS_MULTIPLIER;
             this.state = STATE_ELECTED;
+            this.seat = cluster.seats.splice(0, 1)[0];
             cluster.beingElectedCount--;
         }
     }
 
     updateElected(simulation, dt) {
-        this.position.y += 25 * (dt / 1000);
-        this.mass = 10000;
+        const { parliament } = simulation;
+
+        let dir = Vec2.sub(this.seat, this.position);
+        let dist = dir.length;
+        if (dist < 5) {
+            this.mass = 1;
+        }
+        else {
+            this.mass = 10000;
+        }
+        if (dist > 3) {
+            dir.setMag(1);
+            dir.mult(0.1 * dt / 1000);
+
+            this.velocity.add(dir);
+        }
+        
     }
 
     // Avoids citizens of other clusters.
     static avoid(citizenA, citizenB) {
-        let oneIsElected = (!citizenA.isNormal() || !citizenB.isNormal()) && citizenA.isNormal() != citizenB.isNormal();
-        if (citizenA.clusterId == citizenB.clusterId) return;
+        //let oneIsElected = (!citizenA.isNormal() || !citizenB.isNormal()) && citizenA.isNormal() != citizenB.isNormal();
+       // if (citizenA.clusterId == citizenB.clusterId) return;
         let diff = Vec2.sub(citizenA.position, citizenB.position);
         let distSqrt = diff.sqlength;
-        let radius = citizenA.radius + citizenB.radius + CITIZEN_PADDING * 2;
+        let radius = citizenA.radius + citizenB.radius + CITIZEN_PADDING;
         if (distSqrt > radius * radius) return;
         let overlap = diff.length - radius;
         let m1 = citizenA.mass;//citizenA.radius * citizenA.radius * Math.PI;
         let m2 = citizenB.mass;//citizenB.radius * citizenB.radius * Math.PI;
-
-
-        diff.setMag(1);
-        diff.mult((overlap * m2) / (m1 + m2) * 0.1);
-        citizenA.velocity.sub(diff);
         
         diff.setMag(1);
-        diff.mult((-overlap * m1) / (m1 + m2) * 0.1);
-        citizenB.velocity.add(diff);
+        let dot1 = Vec2.dot(diff, citizenA.velocity);
+        if (dot1 >= 0) {
+            diff.mult(dot1);
+            citizenA.velocity.add(diff);
+        }
+
+        diff.setMag(1);
+        let dot2 = Vec2.dot(diff, citizenB.velocity);
+        if (dot2 >= 0) {
+            diff.mult(dot2);
+            citizenB.velocity.sub(diff);
+        }
 
     }
 
@@ -150,10 +182,12 @@ export default class Citizen {
         let diff = Vec2.sub(citizenA.position, citizenB.position);
         let distSqrt = diff.sqlength;
         let radius = citizenA.radius + citizenB.radius + CITIZEN_PADDING;
-        if (distSqrt > radius * radius) return;
+        if (distSqrt > radius * radius) return false;
 
-        let m1 = citizenA.mass;//citizenA.radius * citizenA.radius * Math.PI;
-        let m2 = citizenB.mass;//citizenB.radius * citizenB.radius * Math.PI;
+        let m1 = citizenA.mass;
+        let m2 = citizenB.mass;
+        let im1 = 1 / citizenA.mass;
+        let im2 = 1 / citizenB.mass;
         let k = (citizenA.k + citizenB.k) / 2;
 
         let dist = Math.sqrt(distSqrt);
@@ -173,27 +207,16 @@ export default class Citizen {
         
         citizenA.position = cp1;
         citizenB.position = cp2;
-
-        if (Vec2.dot(diff, Vec2.sub(citizenA.velocity, citizenB.velocity)) < 0) return;
+        
+        let vdot = Vec2.dot(diff, Vec2.sub(citizenA.velocity, citizenB.velocity));
+        if (vdot < 0) return;
 
         diff.setMag(1);
-
-        let vel1Perpendicular = Vec2.dot(diff, citizenA.velocity);
-        let vel2Perpendicular = Vec2.dot(diff, citizenB.velocity);
-
-        // Calculate the new perpendicular velocities
-        let u1Perpendicular =
-            (1 + k) *
-                ((m1 * vel1Perpendicular + m2 * vel2Perpendicular) / (m1 + m2)) -
-            k * vel1Perpendicular;
-        let u2Perpendicular =
-            (1 + k) *
-                ((m1 * vel1Perpendicular + m2 * vel2Perpendicular) / (m1 + m2)) -
-            k * vel2Perpendicular;
-
+        let i = (-(1.0 + k) * vdot) / (im1 + im2);
+        let impulse = Vec2.mult(diff, i);
+        citizenA.velocity.add(Vec2.mult(impulse, im1));
+        citizenB.velocity.sub(Vec2.mult(impulse, im2));
         
-        citizenA.velocity = Vec2.mult(diff, u1Perpendicular);
-        citizenB.velocity = Vec2.mult(diff, u2Perpendicular);
     }
 
 }
