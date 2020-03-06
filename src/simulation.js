@@ -2,8 +2,11 @@
 import kmeans from './KMeans'
 
 import Quadtree from './QuadTree';
+import Citizen from './Citizen'
+import Vec2 from './vec2';
+import { startUpdateLoop } from './utils'
 
-const POPULATION_SIZE = 100;
+const POPULATION_SIZE = 500;
 const CITIZENS_PER_REP = 10;
 
 const OPINION_COUNT = 5;
@@ -38,6 +41,12 @@ export default function(canvas) {
         for (var i = 0; i < res.length; i++) {
             const cluster = {
                 opinions: res[i],
+                citizenCount: res[i].length,
+                representativeCount: 0,
+                beingElectedCount: 0,
+                timeSinceElection: 0,
+                restCount: 0,
+                representativeMaxCount: Math.round(res[i].length / CITIZENS_PER_REP),
                 x: spacing + spacing * i,
                 y: 100,
                 // HACK: Guess, don't ask how we got here
@@ -49,15 +58,10 @@ export default function(canvas) {
     for (var i = 0; i < clusters.length; i++) {
         const cluster = clusters[i];
         for (var j = 0; j < cluster.opinions.length; j++) {
-            let citizen = {
-                x: BORDER_PADDING + Math.random() * (window.innerWidth - BORDER_PADDING * 2),
-                y: BORDER_PADDING + Math.random() * (window.innerHeight - BORDER_PADDING * 2),
-                vx: 0,
-                vy: 0,
-                opinion: cluster.opinions[j],
-                cluster: i,
-                id: `${i}:${j}`
-            }
+            let citizen = new Citizen(cluster.opinions[j], i);
+            citizen.position.x = BORDER_PADDING + Math.random() * (window.innerWidth - BORDER_PADDING * 2);
+            citizen.position.y = BORDER_PADDING + Math.random() * (window.innerHeight - BORDER_PADDING * 2)
+            citizen.index = citizens.length;
             citizens.push(citizen);
         }
     }
@@ -68,156 +72,61 @@ export default function(canvas) {
         citizens,
         clusters
     }
-/*
-    var lastUpdate = Date.now();
-    function animFrame() {
-        var now = Date.now();
-        var dt = now - lastUpdate;
-        lastUpdate = now;
 
-        update(simulation, dt);
-        render(canvas, ctx, simulation);
-        window.requestAnimationFrame(animFrame);
-    }
-
-    window.requestAnimationFrame(animFrame);
-*/
-    let lastFrameTimeMs = Date.now();
-    const maxFPS = 60;
-    let timestep = 1000 / 60;
-    let delta = 0;
-    function mainLoop() {
-        var timestamp = Date.now();
-        // Throttle the frame rate
-        if (timestamp < lastFrameTimeMs + (1000 / maxFPS)) {
-            window.requestAnimationFrame(mainLoop);
-            return;
-        }
-        delta += timestamp - lastFrameTimeMs;
-        lastFrameTimeMs = timestamp;
-    
-        var numUpdateSteps = 0;
-        while (delta >= timestep) {
-            update(simulation, timestep);
-            delta -= timestep;
-            if (++numUpdateSteps >= 240) {
-                delta = 0;
-                break;
-            }
-        }
-        render(canvas, ctx, simulation);
-        window.requestAnimationFrame(mainLoop);
-    }
-    window.requestAnimationFrame(mainLoop);
-    
+    startUpdateLoop(dt => update(simulation, dt), () => render(canvas, ctx, simulation));    
 }
 
 function update(simulation, dt) {
     const { citizens, clusters } = simulation;
     const maxOpinionDifference = OPINION_COUNT * 2;
-    let quadTrees = [];
-    for (var i = 0; i < clusters.length; i++) {
-        var quadTree = new Quadtree({
-            x: 0,
-            y: 0,
-            width: window.innerWidth,
-            height: window.innerWidth
-        }, 10, 4);
-        quadTrees.push(quadTree);
-    }
+    let quadTree = new Quadtree({
+        x: 0,
+        y: 0,
+        width: window.innerWidth,
+        height: window.innerWidth
+    }, 20, 4);
     for (var i = 0; i < citizens.length; i++) {
         let citizen = citizens[i];
-        let cluster = clusters[citizen.cluster];
-        citizen.col = false;
+        let cluster = clusters[citizen.clusterId];
 
-        citizen.x += citizen.vx * dt;
-        citizen.y += citizen.vy * dt;
+        
 
-        quadTrees[citizen.cluster].insert({
-            x: citizen.x,
-            y: citizen.y,
-            width: CITIZEN_RADIUS,
-            height: CITIZEN_RADIUS,
+        citizen.update(simulation, dt);
+
+        quadTree.insert({
+            x: citizen.position.x,
+            y: citizen.position.y,
+            width: citizen.radius,
+            height: citizen.radius,
             citizen
         })
-
-        citizen.vx = 0;
-        citizen.vy = 0;
-        
-        
-        // Move towards cluster center
-        let dx = citizen.x - cluster.x;
-        let dy = citizen.y - cluster.y;
-        let dist = Math.sqrt(dx * dx + dy * dy);
-        citizen.vx -= dx * 0.00005 * (dist > cluster.radius ? 1.0 : dist / cluster.radius) * dt;
-        citizen.vy -= dy * 0.00005 * (dist > cluster.radius ? 1.0 : dist / cluster.radius) * dt;
-
-
-        if (simulation.prevQuadTrees) {
-            let results = simulation.prevQuadTrees[citizen.cluster].retrieve({
-                x: citizen.x - 50,
-                y: citizen.y - 50,
-                width: 100,
-                height: 100
-            });
-            //if (i == 0) console.log(results);
-        }
-        
     }
 
-    let collisions = [];
+    for (var i = 0; i < clusters.length; i++) {
+        clusters[i].restCount = 0;
+        clusters[i].timeSinceElection += dt / 1000;
+    }
+
     for (var i = 0; i < citizens.length; i++) {
         let citizen = citizens[i];
-        for (var j = i + 1; j < citizens.length; j++) {
-            let other = citizens[j];
-            
-            let dx = other.x - citizen.x;
-            let dy = other.y - citizen.y;
-            let distSqrt = dx * dx + dy * dy;
-
-            //if (citizen.cluster == other.cluster) {
-                let radius = CITIZEN_RADIUS + CITIZEN_PADDING;
-                if (distSqrt <= (radius * 2) * (radius * 2)) {
-                    let dist = Math.sqrt(distSqrt);
-                    let udx = dx / dist;
-                    let udy = dy / dist;
-                    let overlap = (radius * 2) - dist;
-                    other.x += udx * overlap / 2;
-                    other.y += udy * overlap / 2;
-                    citizen.x -= udx * overlap / 2;
-                    citizen.y -= udy * overlap / 2;
-                    citizen.col = true;
-                    other.col = true; 
-
-                    collisions.push([i, j])
-                }
-            //}
+        var elements = quadTree.retrieve({
+            x: citizen.position.x - 10,
+            y: citizen.position.y - 10,
+            width: 20,
+            height: 20
+        });
+        for (var j = 0; j < elements.length; j++) {
+            let other = elements[j].citizen
+            if (other != citizen && other.index > i) {
+                Citizen.collide(citizen, other);
+                Citizen.avoid(citizen, other);
+            }
         }
-    }/*
-
-    for (var collision of collisions) {
-        let citizen = citizens[collision[0]]
-        let other = citizens[collision[1]]
-        
-        let dx = other.x - citizen.x;
-        let dy = other.y - citizen.y;
-        let distSqrt = Math.sqrt(dx * dx + dy * dy);
-        let udx = dx / distSqrt;
-        let udy = dy / distSqrt;
-
-        let dot = other.vx * udx + other.vy * udy;
-        if (dot > 0) {
-            other.vx += udx * dot;
-            other.vy += udy * dot;
+        if (citizen.isAtRest) {
+            if (citizen.isNormal()) 
+                clusters[citizen.clusterId].restCount++;
         }
-
-        dot = citizen.vx * udx + citizen.vy * udy;
-        if (dot > 0) {
-            citizen.vx -= udx * dot;
-            citizen.vy -= udy * dot;
-        }
-    }*/
-    simulation.prevQuadTrees = quadTrees;
+    }
 }
 
 function render(canvas, ctx, simulation) {
@@ -227,10 +136,13 @@ function render(canvas, ctx, simulation) {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
 
-    citizens.forEach(({ x, y, cluster, col }) => {
+    citizens.forEach(({ position, clusterId, radius, col, ...citizen }) => {
         ctx.beginPath();
-        ctx.arc(x, y, CITIZEN_RADIUS, 0, 2 * Math.PI);
-        ctx.fillStyle = ["blue", "red", "green"][cluster]
+        ctx.arc(position.x, position.y, radius, 0, 2 * Math.PI);
+        ctx.fillStyle = ["blue", "red", "green"][clusterId]
+        /*if (citizen.isAtRest) {
+            ctx.fillStyle = citizen.secondsAtRest > 5 ? 'gold' : "black"
+        }*/
         ctx.fill();
         /*
         if (col) {
@@ -241,13 +153,13 @@ function render(canvas, ctx, simulation) {
         }
         */
     });
-
+/*
     clusters.forEach(({ x, y, radius }, i) => {
         ctx.beginPath();
         ctx.arc(x, y, radius, 0, 2 * Math.PI);
         ctx.strokeStyle = ["blue", "red", "green"][i]
         ctx.stroke();
-    });
+    });*/
     
 }
 

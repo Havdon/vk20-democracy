@@ -7,10 +7,13 @@ module.exports = {
     input: 'src/index.js',
     output: {
         file: 'public/bundle.js',
-        format: 'iife'
+        format: 'umd',
+        globals: {
+            'vec2': 'vec2'
+        }
     },
     plugins: [
         serve(),
-        livereload()
+        livereload('public')
     ]
   };
