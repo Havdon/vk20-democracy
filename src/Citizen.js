@@ -2,7 +2,7 @@ import Vec2 from './vec2';
 import { lerp } from './utils'
 
 const CITIZEN_RADIUS = 5;
-const ELECTED_RADIUS_MULTIPLIER = 1.5;
+const ELECTED_RADIUS_MULTIPLIER = 1.75;
 // Seconds it takes to grow when elected.
 const ELECTION_PROCESS_LENGTH = 2; 
 const TIME_BETWEEN_ELECTIONS = 4;

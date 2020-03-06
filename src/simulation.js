@@ -6,7 +6,7 @@ import Citizen from './Citizen'
 import Vec2 from './vec2';
 import { startUpdateLoop } from './utils'
 
-const POPULATION_SIZE = 500;
+const POPULATION_SIZE = 200;
 const CITIZENS_PER_REP = 10;
 
 const OPINION_COUNT = 5;
@@ -34,7 +34,7 @@ export default function(canvas) {
 
     let clusters = [];
 
-    kmeans(allOpinions, 3, function(err, res) {
+    kmeans(allOpinions, 5, function(err, res) {
         if (err) throw new Error(err)
 
         let spacing = window.innerWidth / (res.length + 1)
@@ -139,7 +139,7 @@ function render(canvas, ctx, simulation) {
     citizens.forEach(({ position, clusterId, radius, col, ...citizen }) => {
         ctx.beginPath();
         ctx.arc(position.x, position.y, radius, 0, 2 * Math.PI);
-        ctx.fillStyle = ["blue", "red", "green"][clusterId]
+        ctx.fillStyle = ["blue", "red", "green", "yellow", "purple"][clusterId]
         /*if (citizen.isAtRest) {
             ctx.fillStyle = citizen.secondsAtRest > 5 ? 'gold' : "black"
         }*/

@@ -695,7 +695,7 @@
     }
 
     const CITIZEN_RADIUS = 5;
-    const ELECTED_RADIUS_MULTIPLIER = 1.5;
+    const ELECTED_RADIUS_MULTIPLIER = 1.75;
     // Seconds it takes to grow when elected.
     const ELECTION_PROCESS_LENGTH = 2; 
     const TIME_BETWEEN_ELECTIONS = 4;
@@ -890,7 +890,7 @@
 
     }
 
-    const POPULATION_SIZE = 500;
+    const POPULATION_SIZE = 200;
     const CITIZENS_PER_REP = 10;
 
     const OPINION_COUNT = 5;
@@ -918,7 +918,7 @@
 
         let clusters = [];
 
-        kmeans(allOpinions, 3, function(err, res) {
+        kmeans(allOpinions, 5, function(err, res) {
             if (err) throw new Error(err)
 
             let spacing = window.innerWidth / (res.length + 1);
@@ -1022,7 +1022,7 @@
         citizens.forEach(({ position, clusterId, radius, col, ...citizen }) => {
             ctx.beginPath();
             ctx.arc(position.x, position.y, radius, 0, 2 * Math.PI);
-            ctx.fillStyle = ["blue", "red", "green"][clusterId];
+            ctx.fillStyle = ["blue", "red", "green", "yellow", "purple"][clusterId];
             /*if (citizen.isAtRest) {
                 ctx.fillStyle = citizen.secondsAtRest > 5 ? 'gold' : "black"
             }*/
