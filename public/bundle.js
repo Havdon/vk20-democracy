@@ -1157,7 +1157,7 @@
     function handleOnLoad() {
 
         const canvas = getCanvas();
-        canvas.style = "margin: 0; padding: 0; width: 100%; height: 100%;";
+        canvas.style = "margin: 0; padding: 0; width: 100%; height: 100%; position: absolute; z-index: 6; opacity: 0.2;";
 
         handleOnResize();
         initSimulation(canvas);
@@ -1172,8 +1172,6 @@
         window.onresize = handleOnResize;
     }
 
-
-
-    window.onload = handleOnLoad;
+    window.addEventListener('load', handleOnLoad);
 
 })));
