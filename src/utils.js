@@ -31,8 +31,11 @@ export function startUpdateLoop(updateFn, renderFn) {
             return;
         }
         delta += timestamp - lastFrameTimeMs;
+        if (delta > timestep * maxFPS) {
+            delta = timestep * maxFPS
+        }
         lastFrameTimeMs = timestamp;
-    
+
         var numUpdateSteps = 0;
         while (delta >= timestep) {
             updateFn(timestep);
@@ -49,5 +52,26 @@ export function startUpdateLoop(updateFn, renderFn) {
 }
 
 export function lerp(v0, v1, t) {
-    return v0*(1-t)+v1*t
+    return v0 * (1 - t) + v1 * t
+}
+
+const multiplier = Math.sqrt(3)/2;
+export function drawEqTriangle(ctx, side, cx, cy){
+    
+    var h = side * multiplier;
+    ctx.save();
+    ctx.translate(cx, cy);
+  
+    ctx.beginPath();
+        
+        ctx.moveTo(0, -h / 2);
+        ctx.lineTo( -side / 2, h / 2);
+        ctx.lineTo(side / 2, h / 2);
+        ctx.lineTo(0, -h / 2);
+        
+        ctx.stroke();
+        
+    ctx.closePath();
+    ctx.restore();
+
 }

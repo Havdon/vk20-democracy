@@ -1,18 +1,18 @@
 import Vec2 from './vec2';
 import { lerp } from './utils'
 
-const CITIZEN_RADIUS = 5;
-const ELECTED_RADIUS_MULTIPLIER = 1.75;
-// Seconds it takes to grow when elected.
-const ELECTION_PROCESS_LENGTH = 2; 
-const TIME_BETWEEN_ELECTIONS = 4;
-
-const SPEED_LIMIT = 0.1;
-const AIR_FRICTION = 0.95;
-
-const CITIZEN_PADDING = 5;
-const VELOCITY_HISTORY_LENGTH = 10;
-const STILLNESS_LIMIT = 0.1;
+import {
+    CITIZEN_RADIUS,
+    ELECTED_RADIUS_MULTIPLIER,
+    ELECTION_PROCESS_LENGTH,
+    TIME_BETWEEN_ELECTIONS,
+    MIN_ELECTORATE_SIZE,
+    SPEED_LIMIT,
+    AIR_FRICTION,
+    CITIZEN_PADDING,
+    VELOCITY_HISTORY_LENGTH,
+    STILLNESS_LIMIT
+} from './config'
 
 const STATE_NORMAL = 0;
 const STATE_BEING_ELECTED = 1;
@@ -21,20 +21,25 @@ const STATE_ELECTED = 2;
 export default class Citizen {
 
 
-    constructor(opinions, clusterId) {
+    constructor(opinions, clusterId, scale) {
         this.state = STATE_NORMAL;
         this.position = new Vec2();
         this.prevPosition = this.position.copy;
         this.velocity = new Vec2();
         this.opinions = opinions;
         this.clusterId = clusterId;
-        this.radius = 5;
+        this.radius = 5 * scale;
+        this.scale = scale;
 
         this.k = 0.5;
         this.velocities = [];
         
         this.isAtRest = false;
         this.secondsAtRest = 0;
+        this.sleepCounter = 0;
+
+        this.opacity = 0;
+        this.targetOpacity = 0;
     }
 
     static getElectedFullRadius() {
@@ -47,8 +52,9 @@ export default class Citizen {
 
     update(simulation, dt) {
         let cluster = simulation.clusters[this.clusterId];
+        let movement = this.velocity.length;
         //this.velocities.push(this.velocity.length);
-        this.velocities.push(Vec2.dist(this.prevPosition, this.position));
+        this.velocities.push(movement);
         if (this.velocities.length > VELOCITY_HISTORY_LENGTH) {
             this.velocities.splice(0, this.velocities.length - VELOCITY_HISTORY_LENGTH);
         }
@@ -62,13 +68,29 @@ export default class Citizen {
         }
         this.isAtRest = this.secondsAtRest > 2;
 
+        let sleepCountThresh = 5;
+        if (movement < 0.005) {
+            if (this.sleepCounter < sleepCountThresh) 
+                this.sleepCounter++;
+        }
+        else {
+            if (this.sleepCounter > 0)
+                this.sleepCounter--;
+        }
+
+        this.opacity = lerp(this.opacity, this.targetOpacity, 0.1);
+
+        this.isSleeping = this.sleepCounter == sleepCountThresh;
+
         this.prevPosition = this.position.copy;
 
         if (this.velocity.sqlength > SPEED_LIMIT * SPEED_LIMIT) {
             this.velocity.setMag(SPEED_LIMIT);
         }
         
-        this.position.add(Vec2.mult(this.velocity, dt));
+        if (!this.isSleeping) {
+            this.position.add(Vec2.mult(this.velocity, dt));
+        }
 
         //this.velocity = new Vec2();
         this.velocity.mult(AIR_FRICTION);
@@ -91,7 +113,7 @@ export default class Citizen {
 
         if (this.isAtRest && this.secondsAtRest > 8) {
             if (cluster.representativeCount < cluster.representativeMaxCount) {
-                if (cluster.restCount > Math.floor(cluster.citizenCount / 2) 
+                if (cluster.restCount > Math.floor(cluster.citizenCount * MIN_ELECTORATE_SIZE) 
                     && cluster.beingElectedCount === 0
                     && cluster.timeSinceElection > ELECTION_PROCESS_LENGTH + TIME_BETWEEN_ELECTIONS) {
                     cluster.representativeCount++;
@@ -107,8 +129,8 @@ export default class Citizen {
         let dist = diff.length;
         this.velocity.sub(
             new Vec2(
-            diff.x * 0.000001 * (dist > cluster.radius ? 1.0 : dist / cluster.radius) * dt,
-            diff.y * 0.000001 * (dist > cluster.radius ? 1.0 : dist / cluster.radius) * dt
+            diff.x * 0.0000015 * (dist > cluster.radius ? 1.0 : dist / cluster.radius) * dt,
+            diff.y * 0.0000015 * (dist > cluster.radius ? 1.0 : dist / cluster.radius) * dt
             )
         )
         this.mass = dist;
@@ -120,10 +142,10 @@ export default class Citizen {
         this.radius = lerp( CITIZEN_RADIUS, 
                             CITIZEN_RADIUS * ELECTED_RADIUS_MULTIPLIER, 
                             this.electionTimer / ELECTION_PROCESS_LENGTH
-                            )
+                            ) * this.scale
         5 * (dt / 1000);
         if (this.electionTimer >= ELECTION_PROCESS_LENGTH) {
-            this.radius = CITIZEN_RADIUS * ELECTED_RADIUS_MULTIPLIER;
+            this.radius = CITIZEN_RADIUS * ELECTED_RADIUS_MULTIPLIER  * this.scale;
             this.state = STATE_ELECTED;
             this.seat = cluster.seats.splice(0, 1)[0];
             cluster.beingElectedCount--;
@@ -150,38 +172,11 @@ export default class Citizen {
         
     }
 
-    // Avoids citizens of other clusters.
-    static avoid(citizenA, citizenB) {
-        //let oneIsElected = (!citizenA.isNormal() || !citizenB.isNormal()) && citizenA.isNormal() != citizenB.isNormal();
-       // if (citizenA.clusterId == citizenB.clusterId) return;
-        let diff = Vec2.sub(citizenA.position, citizenB.position);
-        let distSqrt = diff.sqlength;
-        let radius = citizenA.radius + citizenB.radius + CITIZEN_PADDING;
-        if (distSqrt > radius * radius) return;
-        let overlap = diff.length - radius;
-        let m1 = citizenA.mass;//citizenA.radius * citizenA.radius * Math.PI;
-        let m2 = citizenB.mass;//citizenB.radius * citizenB.radius * Math.PI;
-        
-        diff.setMag(1);
-        let dot1 = Vec2.dot(diff, citizenA.velocity);
-        if (dot1 >= 0) {
-            diff.mult(dot1);
-            citizenA.velocity.add(diff);
-        }
-
-        diff.setMag(1);
-        let dot2 = Vec2.dot(diff, citizenB.velocity);
-        if (dot2 >= 0) {
-            diff.mult(dot2);
-            citizenB.velocity.sub(diff);
-        }
-
-    }
-
     static collide(citizenA, citizenB) {
+        
         let diff = Vec2.sub(citizenA.position, citizenB.position);
         let distSqrt = diff.sqlength;
-        let radius = citizenA.radius + citizenB.radius + CITIZEN_PADDING;
+        let radius = citizenA.radius + citizenB.radius + CITIZEN_PADDING * citizenA.scale;
         if (distSqrt > radius * radius) return false;
 
         let m1 = citizenA.mass;
@@ -207,6 +202,7 @@ export default class Citizen {
         
         citizenA.position = cp1;
         citizenB.position = cp2;
+        
         
         let vdot = Vec2.dot(diff, Vec2.sub(citizenA.velocity, citizenB.velocity));
         if (vdot < 0) return;
