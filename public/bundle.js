@@ -60,12 +60,12 @@
   }
 
   const multiplier = Math.sqrt(3)/2;
-  function drawEqTriangle(ctx, side, cx, cy){
+  function drawEqTriangle(ctx, side, cx, cy, rotation = 0){
       
       var h = side * multiplier;
       ctx.save();
       ctx.translate(cx, cy);
-    
+      ctx.rotate(rotation * 0.0174533);
       ctx.beginPath();
           
           ctx.moveTo(0, -h / 2);
@@ -80,16 +80,33 @@
 
   }
 
-  const CANVAS_OPACITY =  0.2;
+  function shuffle(array) {
+      var currentIndex = array.length, temporaryValue, randomIndex;
+    
+      // While there remain elements to shuffle...
+      while (0 !== currentIndex) {
+    
+        // Pick a remaining element...
+        randomIndex = Math.floor(Math.random() * currentIndex);
+        currentIndex -= 1;
+    
+        // And swap it with the current element.
+        temporaryValue = array[currentIndex];
+        array[currentIndex] = array[randomIndex];
+        array[randomIndex] = temporaryValue;
+      }
+    
+      return array;
+    }
 
-  const POPULATION_SIZE = 1000;
+  const CANVAS_OPACITY =  0.7 ;
+
+  const POPULATION_SIZE = 400;
   const CITIZENS_PER_REP = 10;
+  const PARTY_MAX_SIZE = 0.4;
 
   // Number of opinions that citizens have
   const OPINION_COUNT = 5;
-
-  // How close to the window edges citizens can spawn
-  const BORDER_PADDING = 10;
 
   // Radius of the inner circle of the parliament formation.
   const PARLIAMENT_RADIUS = 80;
@@ -98,8 +115,8 @@
   const PARLIAMENT_SPACING = 1.2;
 
   // Number of clusters
-  const MIN_CLUSTERS = 2;
-  const MAX_CLUSTERS = 5;
+  const MIN_CLUSTERS = 7;
+  const MAX_CLUSTERS = 12;
 
   // Radius of a citizen
   const CITIZEN_RADIUS = 5;
@@ -108,19 +125,19 @@
   const CITIZEN_PADDING = 5;
 
   // How much bigger an elected official is
-  const ELECTED_RADIUS_MULTIPLIER = 1.75;
+  const ELECTED_RADIUS_MULTIPLIER = 1;
 
   // Seconds it takes to grow when elected.
-  const ELECTION_PROCESS_LENGTH = 2; 
+  const ELECTION_PROCESS_LENGTH = 0.5; 
 
   // Seconds between elections
-  const TIME_BETWEEN_ELECTIONS = 8;
+  const TIME_BETWEEN_ELECTIONS = 12;
 
   // Percentage of a cluster that have to be at rest to allow for elections.
   const MIN_ELECTORATE_SIZE = 0.7;
 
   // Max speed anyone can move.
-  const SPEED_LIMIT = 0.05;
+  const SPEED_LIMIT = 0.1;
 
   const AIR_FRICTION = 0.8;
 
@@ -129,143 +146,6 @@
 
   // Avg velocity over history has to be below this for a citizen to be asleep.
   const STILLNESS_LIMIT = 0.01;
-
-  function kmeans(vector, k, callback) { 
-      if (!vector || !k || !callback) throw new Error(
-              "Provide 3 arguments: callback, vector, clusters")
-      
-      return new Kmeans(vector, k, callback)
-  }
-
-  // Initialize
-  // ----------
-  function Kmeans (vector, k, callback) {
-      //**Vector:** array of arrays. Inner array
-      //represents a multidimensional data point (vector)  
-      //*These should be normalized*
-      this.callback = callback;
-      this.vector = vector; 
-      //**K:** represents the number of groups/clusters into 
-      //which the vectors will be grouped
-      this.k = k;
-      //Initialize the centroids and clusters     
-      //**Centroids:** represent the center of each cluster. 
-      //They are taken by averaging each dimension of the vectors
-      this.centroids = new Array(k);
-      this.cluster = new Array(k); 
-
-      //Create centroids and place them randomly because 
-      //we don't yet know where the vectors are most concentrated
-      this.createCentroids();
-      
-      this.iterate(this.centroids.slice(0));
-  }
-
-  // Assign vector to each centroid
-  // ----------
-  // Randomly choose **k** vectors from the vector 
-  // array **vector**. These represent our guess 
-  // at where clusters may exist. 
-  Kmeans.prototype.createCentroids = function () {
-      var randomArray = this.vector.slice(0);
-      var self = this;
-      randomArray.sort(function() {
-          return (Math.floor(Math.random() * self.vector.length))
-      });
-      this.centroids = randomArray.slice(0, this.k);
-  };
-
-  // Recursively cluster and move the centroids
-  // ----------
-  //This method groups vectors into clusters and then determine the 
-  //the new location for each centroid based upon the mean
-  //location of the vectors in the cooresponding cluster
-  Kmeans.prototype.iterate = function (vecArray) {
-     
-      this.cluster = new Array(this.k); 
-      
-      var tempArray = [];    
-      for (var a=0; a<this.vector[0].length; a++) {
-          tempArray.push(0);
-      }
-      var vecArray = [];
-      for (var a=0; a<this.k; a++) {
-          vecArray[a] = (tempArray.slice(0));
-      }
-      //Group each vector to a cluster based upon the 
-      //cooresponding centroid
-      for (var i in this.vector) {
-          var v = this.vector[i].slice(0);
-          var index = this.assignCentroid(v);
-          
-          if (!this.cluster[index]) this.cluster[index]=[];
-              this.cluster[index].push(v);
-
-          for (var a=0; a<v.length; a++){
-              vecArray[index][a]+=v[a]; //keep a sum for cluster
-          }
-      }
-
-      //Calculate the mean values for each cluster.
-      var distance 
-          , max = 0; 
-     
-      for (var a=0; a<this.k; a++) {
-          
-          var clusterSize = 0; //cluster is empty
-          if (this.cluster[a]) clusterSize = this.cluster[a].length;
-          
-          for (var b in vecArray[a]) {
-              vecArray[a][b] = vecArray[a][b]/clusterSize;
-          }
-          distance = this.distance(vecArray[a], this.centroids[a]);
-          if (distance>max) 
-              max=distance;
-      }
-      
-      if (max<=0.5)
-          return this.callback(null, this.cluster, this.centroids)
-         
-      //For each centroid use the mean calculated for the 
-      //corresponding cluster (effectively "moving" the centroid
-      //to its new "location")
-      for (var z in vecArray) {
-          this.centroids[z] = vecArray[z].slice(0);
-      }
-      this.iterate(vecArray);
-
-  };
-
-
-  // Determine the closest centroid to a vector
-  // ----------
-  Kmeans.prototype.assignCentroid = function (point) {
-      var min = Infinity
-          , res = 0;
-
-      //For each vector we determine the distance to the 
-      //nearest centroid. The vector is assigned to the 
-      //cluster that corresponds to the nearest centroid.
-      for (var i in this.centroids) {
-          var dist = this.distance(point, this.centroids[i]);
-          if (dist < min) {
-              min = dist;
-              res = i;       
-          }
-      }
-      return res
-  };
-
-  // Calculate euclidian distance between vectors
-  // ----------
-  Kmeans.prototype.distance = function(v1, v2) {
-      var total = 0;
-      for (var c in v1) {
-          if (c!=0)
-          total += Math.pow(v2[c]-v1[c], 2);
-      }
-      return Math.sqrt(total)
-  };
 
   /*
    * Javascript Quadtree 
@@ -627,8 +507,11 @@
      * @param {Vec2} b - Other vector.
      * @return {Vec2} The sum of the vectors.
      */
-    static add(a, b) {
-      return new Vec2(a.x + b.x, a.y + b.y);
+    static add(a, b, vec) {
+      if (!vec) vec = new Vec2();
+      vec.x = a.x + b.x;
+      vec.y = a.y + b.y;
+      return vec;
     }
 
     /**
@@ -637,8 +520,11 @@
      * @param {Vec2} b - Other vector.
      * @return {Vec2} The subtraction of the vectors.
      */
-    static sub(a, b) {
-      return new Vec2(a.x - b.x, a.y - b.y);
+    static sub(a, b, vec) {
+      if (!vec) vec = new Vec2();
+      vec.x = a.x - b.x;
+      vec.y = a.y - b.y;
+      return vec;
     }
 
     /**
@@ -647,8 +533,11 @@
      * @param {number} x - Scalar.
      * @return {Vec2} The multiplied vector.
      */
-    static mult(v, x) {
-      return new Vec2(v.x * x, v.y * x);
+    static mult(v, x, vec) {
+      if (!vec) vec = new Vec2();
+      vec.x = v.x * x;
+      vec.y = v.y * x;
+      return vec;
     }
 
     /**
@@ -657,8 +546,11 @@
      * @param {number} x - Scalar.
      * @return {Vec2} The divided vector.
      */
-    static div(v, x) {
-      return new Vec2(v.x / x, v.y / x);
+    static div(v, x, vec) {
+      if (!vec) vec = new Vec2();
+      vec.x = v.x / x;
+      vec.y = v.y / x;
+      return vec;
     }
 
     /**
@@ -768,6 +660,20 @@
     }
   }
 
+
+  Vec2.cached = [
+    new Vec2(),
+    new Vec2(),
+    new Vec2(),
+    new Vec2(),
+    new Vec2(),
+    new Vec2(),
+    new Vec2(),
+    new Vec2(),
+    new Vec2(),
+    new Vec2()
+  ];
+
   const STATE_NORMAL = 0;
   const STATE_BEING_ELECTED = 1;
   const STATE_ELECTED = 2;
@@ -775,7 +681,7 @@
   class Citizen {
 
 
-      constructor(opinions, clusterId, scale) {
+      constructor(opinions, clusterId, scale, cluster) {
           this.state = STATE_NORMAL;
           this.position = new Vec2();
           this.prevPosition = this.position.copy;
@@ -787,6 +693,9 @@
 
           this.k = 0.5;
           this.velocities = [];
+
+          this.cluster = cluster;
+          this.randomClusterOffset();
           
           this.isAtRest = false;
           this.secondsAtRest = 0;
@@ -798,6 +707,14 @@
 
       static getElectedFullRadius() {
           return CITIZEN_RADIUS * ELECTED_RADIUS_MULTIPLIER + CITIZEN_PADDING;
+      }
+
+      randomClusterOffset() {
+          let x = this.cluster.radius * 2;
+          let y = this.cluster.radius;
+          this.clusterOffset = new Vec2(
+              -(x / 2) + Math.random() * x, 
+              -(y / 2) + Math.random() * y);
       }
 
       isNormal() {
@@ -843,7 +760,7 @@
           }
           
           if (!this.isSleeping) {
-              this.position.add(Vec2.mult(this.velocity, dt));
+              this.position.add(Vec2.mult(this.velocity, dt, Vec2.cached[0]));
           }
 
           //this.velocity = new Vec2();
@@ -869,17 +786,19 @@
               if (cluster.representativeCount < cluster.representativeMaxCount) {
                   if (cluster.restCount > Math.floor(cluster.citizenCount * MIN_ELECTORATE_SIZE) 
                       && cluster.beingElectedCount === 0
-                      && cluster.timeSinceElection > ELECTION_PROCESS_LENGTH + TIME_BETWEEN_ELECTIONS) {
+                      && cluster.timeSinceElection > ELECTION_PROCESS_LENGTH + TIME_BETWEEN_ELECTIONS
+                      && cluster.seats.length > 0) {
                       cluster.representativeCount++;
                       cluster.beingElectedCount++;
                       cluster.timeSinceElection = 0;
                       this.state = STATE_BEING_ELECTED;
                       this.electionTimer = 0;
+                      this.seat = cluster.seats.splice(0, 1)[0];
                   }
               }
           }
 
-          let diff = Vec2.sub(this.position, new Vec2(cluster.x, cluster.y));
+          let diff = Vec2.sub(Vec2.add(this.position, this.clusterOffset, Vec2.cached[0]), new Vec2(cluster.x, cluster.y), Vec2.cached[0]);
           let dist = diff.length;
           this.velocity.sub(
               new Vec2(
@@ -887,20 +806,27 @@
               diff.y * 0.0000015 * (dist > cluster.radius ? 1.0 : dist / cluster.radius) * dt
               )
           );
-          this.mass = dist;
+          this.mass = 1 + dist;
+
+          if (Math.random() < 0.00005) {
+              this.randomClusterOffset();
+          }
       }
 
       updateBeingElected(simulation, dt) {
           this.electionTimer += dt / 1000;
           let cluster = simulation.clusters[this.clusterId];
+          /*
           this.radius = lerp( CITIZEN_RADIUS, 
                               CITIZEN_RADIUS * ELECTED_RADIUS_MULTIPLIER, 
                               this.electionTimer / ELECTION_PROCESS_LENGTH
-                              ) * this.scale;
+                              ) * this.scale
+                              */
+          
           if (this.electionTimer >= ELECTION_PROCESS_LENGTH) {
-              this.radius = CITIZEN_RADIUS * ELECTED_RADIUS_MULTIPLIER  * this.scale;
+              //this.radius = CITIZEN_RADIUS * ELECTED_RADIUS_MULTIPLIER  * this.scale;
               this.state = STATE_ELECTED;
-              this.seat = cluster.seats.splice(0, 1)[0];
+              
               cluster.beingElectedCount--;
           }
       }
@@ -925,10 +851,14 @@
       }
 
       static collide(citizenA, citizenB) {
-          
-          let diff = Vec2.sub(citizenA.position, citizenB.position);
-          let distSqrt = diff.sqlength;
           let radius = citizenA.radius + citizenB.radius + CITIZEN_PADDING * citizenA.scale;
+          if (Math.abs(citizenA.position.x - citizenB.position.x) > radius &&
+              Math.abs(citizenA.position.y - citizenB.position.y) > radius ) 
+              return;
+
+          let diff = Vec2.sub(citizenA.position, citizenB.position, Vec2.cached[0]);
+          let distSqrt = diff.sqlength;
+          
           if (distSqrt > radius * radius) return false;
 
           let m1 = citizenA.mass;
@@ -940,33 +870,54 @@
           let dist = Math.sqrt(distSqrt);
           let overlap = radius - dist;
 
-          let cp1 = citizenA.position.copy;
-          let cp2 = citizenB.position.copy;
-
-          
           diff.setMag(1);
           diff.mult((overlap * m2) / (m1 + m2));
-          cp1.add(diff);
+          citizenA.position.add(diff);
 
           diff.setMag(1);
           diff.mult((-overlap * m1) / (m1 + m2));
-          cp2.add(diff);
-          
-          citizenA.position = cp1;
-          citizenB.position = cp2;
+          citizenB.position.add(diff);
           
           
-          let vdot = Vec2.dot(diff, Vec2.sub(citizenA.velocity, citizenB.velocity));
+          let vdot = Vec2.dot(diff, Vec2.sub(citizenA.velocity, citizenB.velocity, Vec2.cached[1]));
           if (vdot < 0) return;
 
           diff.setMag(1);
           let i = (-(1.0 + k) * vdot) / (im1 + im2);
-          let impulse = Vec2.mult(diff, i);
-          citizenA.velocity.add(Vec2.mult(impulse, im1));
-          citizenB.velocity.sub(Vec2.mult(impulse, im2));
+          let impulse = Vec2.mult(diff, i, Vec2.cached[2]);
+          citizenA.velocity.add(Vec2.mult(impulse, im1, Vec2.cached[3]));
+          citizenB.velocity.sub(Vec2.mult(impulse, im2, Vec2.cached[4]));
           
       }
 
+  }
+
+  function sortIntoClusters(opinions, clusterCount) {
+      let indecies = [];
+      var counts = [];
+      for (var i = 0; i < clusterCount; i++) {
+          indecies.push(i);
+          counts.push(0);
+      }
+      shuffle(indecies);
+
+      var results = [];
+      let total = 1;
+      let maxPercentage = Math.max(PARTY_MAX_SIZE, total / clusterCount);
+      for (var i = 0; i < clusterCount; i++) {
+          let per = total * Math.random();
+          if (per > maxPercentage) per = maxPercentage;
+          total -= per;
+          counts[indecies[i]] = per;
+      }
+      
+      let ix = 0;
+      for (var i = 0; i < clusterCount; i++) {
+          let percentage = counts[i];
+          results.push(opinions.slice(ix, Math.round(opinions.length * percentage)));
+      }
+
+      return results;
   }
 
   function initSimulation(canvas, centerOn) {
@@ -1000,76 +951,84 @@
 
       let clusters = [];
 
-      const clusterCount = MIN_CLUSTERS + Math.round(Math.random() * MAX_CLUSTERS);
+      const clusterCount = MIN_CLUSTERS + Math.round(Math.random() * (MAX_CLUSTERS - MIN_CLUSTERS));
 
-      kmeans(allOpinions, clusterCount, function(err, res) {
-          if (err) throw new Error(err)
+      let clusterPositionRadius = window.innerWidth;
+      let clusterCircleCenter = new Vec2(window.innerWidth / 2,
+          parliament.position.y / 2 + clusterPositionRadius);
+      
+      if (centerOn) {
+          let bb = centerOn.getBoundingClientRect();
+          clusterCircleCenter.y = (window.scrollY + bb.y) / 2 + clusterPositionRadius;
+      }
+
+      let res = sortIntoClusters(allOpinions, clusterCount);
+      
+      let minAngle = -180;
+      let maxAngle = 0;
 
 
-          let clusterPositionRadius = window.innerHeight * 0.8;
-          let clusterCircleCenter = new Vec2(window.innerWidth / 2,
-              window.innerHeight);
+      // Calculate min + max angles, if t
+      if (window.innerWidth < clusterPositionRadius * 2) {
+          let left = new Vec2(
+              0, 
+              clusterCircleCenter.y - Math.sqrt(clusterPositionRadius * clusterPositionRadius - Math.pow(clusterCircleCenter.x - 0, 2))
+          );
+          let right = new Vec2(
+              window.innerWidth, 
+              clusterCircleCenter.y - Math.sqrt(clusterPositionRadius * clusterPositionRadius - Math.pow(clusterCircleCenter.x - window.innerWidth, 2))
+          );
 
-          let minAngle = -180;
-          let maxAngle = 0;
+          let dirL = Vec2.sub(clusterCircleCenter, left);
+          let dirR = Vec2.sub(clusterCircleCenter, right);
 
+          minAngle = dirL.heading * 57.2958 - 180;
+          maxAngle = dirR.heading * 57.2958 - 180;
+      }
+      
+      let range = maxAngle - minAngle;
+      let spacing = range / (clusterCount + 1);
 
-          // Calculate min + max angles, if t
-          if (window.innerWidth < clusterPositionRadius * 2) {
-              let left = new Vec2(
-                  0, 
-                  clusterCircleCenter.y - Math.sqrt(clusterPositionRadius * clusterPositionRadius - Math.pow(clusterCircleCenter.x - 0, 2))
-              );
-              let right = new Vec2(
-                  window.innerWidth, 
-                  clusterCircleCenter.y - Math.sqrt(clusterPositionRadius * clusterPositionRadius - Math.pow(clusterCircleCenter.x - window.innerWidth, 2))
-              );
+      let seatsGiven = 0;
 
-              let dirL = Vec2.sub(clusterCircleCenter, left);
-              let dirR = Vec2.sub(clusterCircleCenter, right);
+      for (var i = 0; i < res.length; i++) {
+          let citizenArea = Math.PI * Math.pow((CITIZEN_RADIUS + CITIZEN_PADDING * scale), 2);
+          const cluster = {
+              opinions: res[i],
+              citizenCount: res[i].length,
+              representativeCount: 0,
+              beingElectedCount: 0,
+              timeSinceElection: 0,
+              restCount: 0,
+              representativeMaxCount: Math.round(res[i].length / CITIZENS_PER_REP),
+              x: clusterCircleCenter.x + Math.cos((minAngle + (spacing + i * spacing)) * Math.PI / 180) * clusterPositionRadius + (-(window.innerWidth / 2) + Math.random() * window.innerWidth),
+              y: clusterCircleCenter.y + Math.sin((minAngle + (spacing + i * spacing)) * Math.PI / 180) * clusterPositionRadius + (-(window.innerHeight / 2) + Math.random() * window.innerHeight),
+              finalX: clusterCircleCenter.x + Math.cos((minAngle + (spacing + i * spacing)) * Math.PI / 180) * clusterPositionRadius,
+              finalY: clusterCircleCenter.y + Math.sin((minAngle + (spacing + i * spacing)) * Math.PI / 180) * clusterPositionRadius,
+              
+              // Radius calculated based on the circle packing constant.
+              radius: Math.sqrt(citizenArea * res[i].length * 0.9069) / Math.PI * 2
+          };
+          seatsGiven += cluster.representativeMaxCount;
+          clusters.push(cluster);
+      }
 
-              minAngle = dirL.heading * 57.2958 - 180;
-              maxAngle = dirR.heading * 57.2958 - 180;
-          }
-          
-          let range = maxAngle - minAngle;
-          let spacing = range / (clusterCount + 1);
+      // If too few seats were given, we give the remaining to the last cluster.
+      if (seatsGiven < res.length) {
+          clusters[clusters.length - 1].representativeMaxCount += res.length - seatsGiven;
+      }
 
-          let seatsGiven = 0;
-
-          for (var i = 0; i < res.length; i++) {
-              let citizenArea = Math.PI * Math.pow((CITIZEN_RADIUS + CITIZEN_PADDING * scale), 2);
-              const cluster = {
-                  opinions: res[i],
-                  citizenCount: res[i].length,
-                  representativeCount: 0,
-                  beingElectedCount: 0,
-                  timeSinceElection: 0,
-                  restCount: 0,
-                  representativeMaxCount: Math.round(res[i].length / CITIZENS_PER_REP),
-                  x: clusterCircleCenter.x + Math.cos((minAngle + (spacing + i * spacing)) * Math.PI / 180) * clusterPositionRadius,
-                  y: clusterCircleCenter.y + Math.sin((minAngle + (spacing + i * spacing)) * Math.PI / 180) * clusterPositionRadius,
-                  finalX: clusterCircleCenter.x + Math.cos((minAngle + (spacing + i * spacing)) * Math.PI / 180) * clusterPositionRadius * 0.5,
-                  finalY: clusterCircleCenter.y + Math.sin((minAngle + (spacing + i * spacing)) * Math.PI / 180) * clusterPositionRadius * 0.5,
-                  
-                  // Radius calculated based on the circle packing constant.
-                  radius: Math.sqrt(citizenArea * res[i].length * 0.9069) / Math.PI * 2
-              };
-              seatsGiven += cluster.representativeMaxCount;
-              clusters.push(cluster);
-          }
-
-          // If too few seats were given, we give the remaining to the last cluster.
-          if (seatsGiven < res.length) {
-              clusters[clusters.length - 1].representativeMaxCount += res.length - seatsGiven;
-          }
-      });
       for (var i = 0; i < clusters.length; i++) {
           const cluster = clusters[i];
           for (var j = 0; j < cluster.opinions.length; j++) {
-              let citizen = new Citizen(cluster.opinions[j], i, scale);
-              citizen.position.x = BORDER_PADDING + Math.random() * (window.innerWidth - BORDER_PADDING * 2);
-              citizen.position.y = BORDER_PADDING + Math.random() * (window.innerHeight - BORDER_PADDING * 2);
+              let citizen = new Citizen(cluster.opinions[j], i, scale, cluster);
+              /*
+              citizen.position.x = -window.innerWidth + Math.random() * (window.innerWidth * 3);
+              citizen.position.y = -window.innerHeight + Math.random() * (window.innerHeight * 3)
+              */
+              let ang = Math.PI * 2 * Math.random();
+              citizen.position.x = clusters[i].x + Math.cos(ang) * (Math.random() * window.innerWidth / 2);
+              citizen.position.y = clusters[i].y + Math.sin(ang) * (Math.random() * window.innerWidth / 2);
               citizen.index = citizens.length;
               citizens.push(citizen);
           }
@@ -1080,7 +1039,9 @@
       const simulation = {
           citizens,
           clusters,
-          parliament
+          parliament,
+          clusterPositionRadius,
+          clusterCircleCenter
       };
 
       simulation.parliament.seats = createSeatingOrder(simulation);
@@ -1097,11 +1058,11 @@
   function update(simulation, dt) {
       const { citizens, clusters } = simulation;
       let quadTree = new Quadtree({
-          x: 0,
-          y: 0,
-          width: window.innerWidth,
-          height: window.innerWidth
-      }, 10, 5);
+          x: -window.innerWidth,
+          y: -window.innerHeight,
+          width: window.innerWidth * 3,
+          height: window.innerHeight * 3
+      }, 20, 10);
       for (var i = 0; i < citizens.length; i++) {
           let citizen = citizens[i];
           let cluster = clusters[citizen.clusterId];
@@ -1111,10 +1072,10 @@
           citizen.update(simulation, dt);
 
           quadTree.insert({
-              x: citizen.position.x,
-              y: citizen.position.y,
-              width: citizen.radius,
-              height: citizen.radius,
+              x: citizen.position.x - citizen.radius,
+              y: citizen.position.y - citizen.radius,
+              width: citizen.radius * 2,
+              height: citizen.radius * 2,
               citizen
           });
       }
@@ -1122,10 +1083,8 @@
       for (var i = 0; i < clusters.length; i++) {
           clusters[i].restCount = 0;
           clusters[i].timeSinceElection += dt / 1000;
-          /*if (clusters[i].representativeCount == clusters[i].representativeMaxCount) {
-              clusters[i].x = lerp(clusters[i].x, clusters[i].finalX, 0.01)
-              clusters[i].y = lerp(clusters[i].y, clusters[i].finalY, 0.01)
-          }*/
+          clusters[i].x = lerp(clusters[i].x, clusters[i].finalX, 0.0007);
+          clusters[i].y = lerp(clusters[i].y, clusters[i].finalY, 0.0007);
       }
 
       
@@ -1133,10 +1092,10 @@
           let citizen = citizens[i];
           
           var elements = quadTree.retrieve({
-              x: citizen.position.x - 10,
-              y: citizen.position.y - 10,
-              width: 20,
-              height: 20
+              x: citizen.position.x - citizen.radius * 2,
+              y: citizen.position.y - citizen.radius * 2,
+              width: citizen.radius * 4,
+              height: citizen.radius * 4
           });
           for (var j = 0; j < elements.length; j++) {
               let other = elements[j].citizen;
@@ -1158,44 +1117,152 @@
 
   }
   function render(canvas, ctx, simulation) {
-      const { citizens, clusters, parliament } = simulation;
+      const { 
+          citizens, 
+          clusters, 
+          parliament,
+          clusterPositionRadius,
+          clusterCircleCenter } = simulation;
 
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.beginPath();
+      ctx.arc(clusterCircleCenter.x, clusterCircleCenter.y, clusterPositionRadius, 0, 2 * Math.PI);
+      ctx.stroke();
       
       ctx.lineWidth = 2;
       citizens.forEach((citizen) => {
           let { position, clusterId, radius, col } = citizen;
-          ctx.beginPath();
-          switch (clusterId + ( 0)) {
-              case 1: {
-                  // Diamond / Box
-                  let size = radius;
-                  ctx.save();
-                  ctx.translate(position.x, position.y);
-                  //ctx.rotate(45 * 0.0174533);
-                  ctx.moveTo(-size, -size);
-                  ctx.lineTo(-size, +size);
-                  ctx.lineTo(+size, +size);
-                  ctx.lineTo(+size, -size);
-                  ctx.lineTo(-size, -size);
-                  // An extra line is needed to make the corner of the square nice.
-                  ctx.lineTo(-size, +size);
-                  ctx.restore();
+          {
+              let color = 220 - (220 * citizen.opacity);
+              if (!citizen.isNormal()) color = 0;
+              ctx.strokeStyle = `rgb(${color}, ${color}, ${color})`;
+          }
+          
+          if (citizen.isNormal()) {
+              let canvas = getCachedCanvasImg(clusterId, radius);
+              ctx.save();
+              {
+                 // let distToMid = 0.2 * 0.8 * Math.abs(citizen.position.x - window.innerWidth / 2) / (window.innerWidth / 2)
+                  ctx.globalAlpha = 0.1 + (citizen.opacity * 0.9);// * distToMid;
               }
-                  break;
-              case 2: {
-                  // Triangle
-                  drawEqTriangle(ctx, radius * 2.5, position.x, position.y);
+              ctx.drawImage(canvas, position.x - canvas.width / 2, position.y - canvas.height / 2);
+              ctx.restore();
+          }
+          else {
+              ctx.save();
+              ctx.translate(position.x, position.y);
+              drawCitizenInCtx(clusterId, radius, ctx, 0);
+              ctx.restore();
+          }
+      });
+  }
+
+  let imgCache = {};
+  function getCachedCanvasImg(clusterId, radius) {
+      if (!imgCache[clusterId]) {
+          let offscreen = document.createElement('canvas');
+          offscreen.width = radius * 3;
+          offscreen.height = radius * 3;
+          let ctx = offscreen.getContext('2d');
+          ctx.lineWidth = 2;
+
+          drawCitizenInCtx(clusterId, radius, ctx, radius * 3 / 2);
+          
+          imgCache[clusterId] = offscreen;
+      }
+      
+      return imgCache[clusterId];
+      
+  }
+
+  function drawCitizenInCtx(clusterId, radius, ctx, offset) {
+      ctx.beginPath();
+      switch (clusterId + ( 0)) {
+          case 1: {
+              // Diamond / Box
+              let size = radius;
+              ctx.save();
+              ctx.translate(offset, offset);
+              //ctx.rotate(45 * 0.0174533);
+              ctx.moveTo(-size, -size);
+              ctx.lineTo(-size, +size);
+              ctx.lineTo(+size, +size);
+              ctx.lineTo(+size, -size);
+              ctx.lineTo(-size, -size);
+              // An extra line is needed to make the corner of the square nice.
+              ctx.lineTo(-size, +size);
+              ctx.restore();
+          }
+              break;
+          case 2: {
+              // Triangle
+              drawEqTriangle(ctx, radius * 2.5, offset, offset);
+          }
+              break;
+          case 3: {
+              // Plus
+              let size = radius + 2;
+              let width = size / 3;
+              ctx.save();
+              ctx.translate(offset, offset);
+              ctx.rotate(45 * 0.0174533);
+              ctx.moveTo(-size, +width);
+              ctx.lineTo(-size, -width);
+              ctx.lineTo(-width, -width);
+              ctx.lineTo(-width, -size);
+              ctx.lineTo(+width, -size);
+              ctx.lineTo(+width, -width);
+              ctx.lineTo(+size, -width);
+              ctx.lineTo(+size, +width);
+              ctx.lineTo(+width, +width);
+              ctx.lineTo(+width, +size);
+              ctx.lineTo(-width, +size);
+              ctx.lineTo(-width, +width);
+              ctx.lineTo(-size, +width);
+              ctx.lineTo(-size, -width);
+              ctx.restore();
+          }
+              break;
+          case 4: {
+              ctx.beginPath();
+              for (var i = 0; i < Math.PI * 2; i += Math.PI * 2 / 5) {
+                  let x = offset + Math.cos(i - (90 * Math.PI / 180)) * radius * 1.3;
+                  let y = offset + Math.sin(i - (90 * Math.PI / 180)) * radius * 1.3;
+                  if (i == 0) {
+                      ctx.moveTo(x, y);
+                  }
+                  else {
+                      ctx.lineTo(x, y);
+                  }
               }
-                  break;
-              case 3: {
+              ctx.closePath();
+              ctx.stroke();
+              break;
+          }
+          case 5: {
+              // Diamond / Box
+              let size = radius;
+              ctx.save();
+              ctx.translate(offset, offset);
+              ctx.rotate(45 * 0.0174533);
+              ctx.moveTo(-size, -size);
+              ctx.lineTo(-size, +size);
+              ctx.lineTo(+size, +size);
+              ctx.lineTo(+size, -size);
+              ctx.lineTo(-size, -size);
+              // An extra line is needed to make the corner of the square nice.
+              ctx.lineTo(-size, +size);
+              ctx.restore();
+          }
+              break;
+          case 6: {
                   // Plus
                   let size = radius + 2;
                   let width = size / 3;
                   ctx.save();
-                  ctx.translate(position.x, position.y);
-                  ctx.rotate(45 * 0.0174533);
+                  ctx.translate(offset, offset);
                   ctx.moveTo(-size, +width);
                   ctx.lineTo(-size, -width);
                   ctx.lineTo(-width, -width);
@@ -1213,41 +1280,22 @@
                   ctx.restore();
               }
                   break;
-              case 4: {
-                  ctx.beginPath();
-                  for (var i = 0; i < Math.PI * 2; i += Math.PI * 2 / 5) {
-                      let x = position.x + Math.cos(i - (90 * Math.PI / 180)) * radius * 1.3;
-                      let y = position.y + Math.sin(i - (90 * Math.PI / 180)) * radius * 1.3;
-                      if (i == 0) {
-                          ctx.moveTo(x, y);
-                      }
-                      else {
-                          ctx.lineTo(x, y);
-                      }
-                  }
-                  ctx.closePath();
-                  ctx.stroke();
-                  break;
-              }
-              default:
-                  // Circle
-                  ctx.arc(position.x, position.y, radius, 0, 2 * Math.PI);
-                  break;
+          
+          case 7: {
+              // Triangle
+              drawEqTriangle(ctx, radius * 2.5, offset, offset, 180);
           }
-          //ctx.fillStyle = citizen.isSleeping ? 'orange' : 'black'
-          /*if (citizen.isAtRest) {
-              ctx.fillStyle = citizen.secondsAtRest > 5 ? 'gold' : "black"
-          }*/
-          ctx.stroke();
-          /*
-          if (col) {
-              ctx.beginPath();
-              ctx.arc(x, y, CITIZEN_RADIUS + 2, 0, 2 * Math.PI);
-              ctx.strokeStyle = "yellow"
-              ctx.stroke();
-          }
-          */
-      });
+              break;
+          default:
+              // Circle
+              ctx.arc(offset, offset, radius, 0, 2 * Math.PI);
+              break;
+      }
+      //ctx.fillStyle = citizen.isSleeping ? 'orange' : 'black'
+      /*if (citizen.isAtRest) {
+          ctx.fillStyle = citizen.secondsAtRest > 5 ? 'gold' : "black"
+      }*/
+      ctx.stroke();
   }
 
   function createSeatingOrder(simulation) {
@@ -1312,7 +1360,15 @@
   function handleOnLoad() {
 
       const canvas = getCanvas();
-      canvas.style = `pointer-events: none; margin: 0; padding: 0; width: 100%; height: 100%; position: absolute; z-index: 6; opacity: ${CANVAS_OPACITY};`;
+      canvas.style = `
+    pointer-events: none; 
+    margin: 0; 
+    padding: 0; 
+    width: 100%; 
+    height: 100%; 
+    position: absolute;
+    z-index: 6; opacity: ${CANVAS_OPACITY};
+    `;
 
       let centerOn = canvas.getAttribute('data-center-on');
       if (centerOn != null) {

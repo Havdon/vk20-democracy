@@ -1,5 +1,5 @@
 import Vec2 from './vec2';
-import { lerp } from './utils'
+import { lerp, gaussianRand } from './utils'
 
 import {
     CITIZEN_RADIUS,
@@ -21,7 +21,7 @@ const STATE_ELECTED = 2;
 export default class Citizen {
 
 
-    constructor(opinions, clusterId, scale) {
+    constructor(opinions, clusterId, scale, cluster) {
         this.state = STATE_NORMAL;
         this.position = new Vec2();
         this.prevPosition = this.position.copy;
@@ -33,6 +33,9 @@ export default class Citizen {
 
         this.k = 0.5;
         this.velocities = [];
+
+        this.cluster = cluster;
+        this.randomClusterOffset();
         
         this.isAtRest = false;
         this.secondsAtRest = 0;
@@ -44,6 +47,14 @@ export default class Citizen {
 
     static getElectedFullRadius() {
         return CITIZEN_RADIUS * ELECTED_RADIUS_MULTIPLIER + CITIZEN_PADDING;
+    }
+
+    randomClusterOffset() {
+        let x = this.cluster.radius * 2;
+        let y = this.cluster.radius;
+        this.clusterOffset = new Vec2(
+            -(x / 2) + Math.random() * x, 
+            -(y / 2) + Math.random() * y)
     }
 
     isNormal() {
@@ -89,7 +100,7 @@ export default class Citizen {
         }
         
         if (!this.isSleeping) {
-            this.position.add(Vec2.mult(this.velocity, dt));
+            this.position.add(Vec2.mult(this.velocity, dt, Vec2.cached[0]));
         }
 
         //this.velocity = new Vec2();
@@ -115,17 +126,19 @@ export default class Citizen {
             if (cluster.representativeCount < cluster.representativeMaxCount) {
                 if (cluster.restCount > Math.floor(cluster.citizenCount * MIN_ELECTORATE_SIZE) 
                     && cluster.beingElectedCount === 0
-                    && cluster.timeSinceElection > ELECTION_PROCESS_LENGTH + TIME_BETWEEN_ELECTIONS) {
+                    && cluster.timeSinceElection > ELECTION_PROCESS_LENGTH + TIME_BETWEEN_ELECTIONS
+                    && cluster.seats.length > 0) {
                     cluster.representativeCount++;
                     cluster.beingElectedCount++;
                     cluster.timeSinceElection = 0;
                     this.state = STATE_BEING_ELECTED;
                     this.electionTimer = 0;
+                    this.seat = cluster.seats.splice(0, 1)[0];
                 }
             }
         }
 
-        let diff = Vec2.sub(this.position, new Vec2(cluster.x, cluster.y));
+        let diff = Vec2.sub(Vec2.add(this.position, this.clusterOffset, Vec2.cached[0]), new Vec2(cluster.x, cluster.y), Vec2.cached[0]);
         let dist = diff.length;
         this.velocity.sub(
             new Vec2(
@@ -133,21 +146,27 @@ export default class Citizen {
             diff.y * 0.0000015 * (dist > cluster.radius ? 1.0 : dist / cluster.radius) * dt
             )
         )
-        this.mass = dist;
+        this.mass = 1 + dist;
+
+        if (Math.random() < 0.00005) {
+            this.randomClusterOffset();
+        }
     }
 
     updateBeingElected(simulation, dt) {
         this.electionTimer += dt / 1000;
         let cluster = simulation.clusters[this.clusterId];
+        /*
         this.radius = lerp( CITIZEN_RADIUS, 
                             CITIZEN_RADIUS * ELECTED_RADIUS_MULTIPLIER, 
                             this.electionTimer / ELECTION_PROCESS_LENGTH
                             ) * this.scale
-        5 * (dt / 1000);
+                            */
+        
         if (this.electionTimer >= ELECTION_PROCESS_LENGTH) {
-            this.radius = CITIZEN_RADIUS * ELECTED_RADIUS_MULTIPLIER  * this.scale;
+            //this.radius = CITIZEN_RADIUS * ELECTED_RADIUS_MULTIPLIER  * this.scale;
             this.state = STATE_ELECTED;
-            this.seat = cluster.seats.splice(0, 1)[0];
+            
             cluster.beingElectedCount--;
         }
     }
@@ -173,10 +192,14 @@ export default class Citizen {
     }
 
     static collide(citizenA, citizenB) {
-        
-        let diff = Vec2.sub(citizenA.position, citizenB.position);
-        let distSqrt = diff.sqlength;
         let radius = citizenA.radius + citizenB.radius + CITIZEN_PADDING * citizenA.scale;
+        if (Math.abs(citizenA.position.x - citizenB.position.x) > radius &&
+            Math.abs(citizenA.position.y - citizenB.position.y) > radius ) 
+            return;
+
+        let diff = Vec2.sub(citizenA.position, citizenB.position, Vec2.cached[0]);
+        let distSqrt = diff.sqlength;
+        
         if (distSqrt > radius * radius) return false;
 
         let m1 = citizenA.mass;
@@ -188,30 +211,23 @@ export default class Citizen {
         let dist = Math.sqrt(distSqrt);
         let overlap = radius - dist;
 
-        let cp1 = citizenA.position.copy;
-        let cp2 = citizenB.position.copy;
-
-        
         diff.setMag(1);
         diff.mult((overlap * m2) / (m1 + m2));
-        cp1.add(diff);
+        citizenA.position.add(diff);
 
         diff.setMag(1);
         diff.mult((-overlap * m1) / (m1 + m2));
-        cp2.add(diff);
-        
-        citizenA.position = cp1;
-        citizenB.position = cp2;
+        citizenB.position.add(diff);
         
         
-        let vdot = Vec2.dot(diff, Vec2.sub(citizenA.velocity, citizenB.velocity));
+        let vdot = Vec2.dot(diff, Vec2.sub(citizenA.velocity, citizenB.velocity, Vec2.cached[1]));
         if (vdot < 0) return;
 
         diff.setMag(1);
         let i = (-(1.0 + k) * vdot) / (im1 + im2);
-        let impulse = Vec2.mult(diff, i);
-        citizenA.velocity.add(Vec2.mult(impulse, im1));
-        citizenB.velocity.sub(Vec2.mult(impulse, im2));
+        let impulse = Vec2.mult(diff, i, Vec2.cached[2]);
+        citizenA.velocity.add(Vec2.mult(impulse, im1, Vec2.cached[3]));
+        citizenB.velocity.sub(Vec2.mult(impulse, im2, Vec2.cached[4]));
         
     }
 

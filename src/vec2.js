@@ -135,8 +135,11 @@ export default class Vec2 {
    * @param {Vec2} b - Other vector.
    * @return {Vec2} The sum of the vectors.
    */
-  static add(a, b) {
-    return new Vec2(a.x + b.x, a.y + b.y);
+  static add(a, b, vec) {
+    if (!vec) vec = new Vec2();
+    vec.x = a.x + b.x;
+    vec.y = a.y + b.y;
+    return vec;
   }
 
   /**
@@ -145,8 +148,11 @@ export default class Vec2 {
    * @param {Vec2} b - Other vector.
    * @return {Vec2} The subtraction of the vectors.
    */
-  static sub(a, b) {
-    return new Vec2(a.x - b.x, a.y - b.y);
+  static sub(a, b, vec) {
+    if (!vec) vec = new Vec2();
+    vec.x = a.x - b.x;
+    vec.y = a.y - b.y;
+    return vec;
   }
 
   /**
@@ -155,8 +161,11 @@ export default class Vec2 {
    * @param {number} x - Scalar.
    * @return {Vec2} The multiplied vector.
    */
-  static mult(v, x) {
-    return new Vec2(v.x * x, v.y * x);
+  static mult(v, x, vec) {
+    if (!vec) vec = new Vec2();
+    vec.x = v.x * x;
+    vec.y = v.y * x;
+    return vec;
   }
 
   /**
@@ -165,8 +174,11 @@ export default class Vec2 {
    * @param {number} x - Scalar.
    * @return {Vec2} The divided vector.
    */
-  static div(v, x) {
-    return new Vec2(v.x / x, v.y / x);
+  static div(v, x, vec) {
+    if (!vec) vec = new Vec2();
+    vec.x = v.x / x;
+    vec.y = v.y / x;
+    return vec;
   }
 
   /**
@@ -275,3 +287,17 @@ export default class Vec2 {
     return new Vec2(obj.x, obj.y);
   }
 }
+
+
+Vec2.cached = [
+  new Vec2(),
+  new Vec2(),
+  new Vec2(),
+  new Vec2(),
+  new Vec2(),
+  new Vec2(),
+  new Vec2(),
+  new Vec2(),
+  new Vec2(),
+  new Vec2()
+]
