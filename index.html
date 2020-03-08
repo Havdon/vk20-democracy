@@ -1417,9 +1417,13 @@
 <script src="public/vk20-visualization.min.js"></script>
 <script>
     window.addEventListener('load', () => {
+        var height = Math.max(document.body.scrollHeight, document.body.offsetHeight, 
+        document.documentElement.clientHeight, document.documentElement.scrollHeight, document.documentElement.offsetHeight );
+
         var result = initParliamentVisualization({
             centerElement: document.querySelector(".css-1n1c6cf > video"), 
-            zIndex: 6
+            zIndex: 1000,
+            height: height
         })
     });
 </script>

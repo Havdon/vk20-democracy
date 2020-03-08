@@ -11,7 +11,8 @@ import {
     AIR_FRICTION,
     CITIZEN_PADDING,
     VELOCITY_HISTORY_LENGTH,
-    STILLNESS_LIMIT
+    STILLNESS_LIMIT,
+    FORM_PARLIAMENT
 } from './config'
 
 const STATE_NORMAL = 0;
@@ -122,18 +123,20 @@ export default class Citizen {
     updateNormal(simulation, dt) {
         let cluster = simulation.clusters[this.clusterId];
 
-        if (this.isAtRest && this.secondsAtRest > 8) {
-            if (cluster.representativeCount < cluster.representativeMaxCount) {
-                if (cluster.restCount > Math.floor(cluster.citizenCount * MIN_ELECTORATE_SIZE) 
-                    && cluster.beingElectedCount === 0
-                    && cluster.timeSinceElection > ELECTION_PROCESS_LENGTH + TIME_BETWEEN_ELECTIONS
-                    && cluster.seats.length > 0) {
-                    cluster.representativeCount++;
-                    cluster.beingElectedCount++;
-                    cluster.timeSinceElection = 0;
-                    this.state = STATE_BEING_ELECTED;
-                    this.electionTimer = 0;
-                    this.seat = cluster.seats.splice(0, 1)[0];
+        if (FORM_PARLIAMENT) {
+            if (this.isAtRest && this.secondsAtRest > 8) {
+                if (cluster.representativeCount < cluster.representativeMaxCount) {
+                    if (cluster.restCount > Math.floor(cluster.citizenCount * MIN_ELECTORATE_SIZE) 
+                        && cluster.beingElectedCount === 0
+                        && cluster.timeSinceElection > ELECTION_PROCESS_LENGTH + TIME_BETWEEN_ELECTIONS
+                        && cluster.seats.length > 0) {
+                        cluster.representativeCount++;
+                        cluster.beingElectedCount++;
+                        cluster.timeSinceElection = 0;
+                        this.state = STATE_BEING_ELECTED;
+                        this.electionTimer = 0;
+                        this.seat = cluster.seats.splice(0, 1)[0];
+                    }
                 }
             }
         }

@@ -22,7 +22,9 @@ import {
     ONLY_CIRCLES,
     VARIABLE_COLOR,
     PARTY_MAX_SIZE,
-    FADE_DISTANCE
+    FADE_DISTANCE,
+    CLUSTER_RANDOMLY,
+    SOLID_SHAPES
 } from './config'
 
 function sortIntoClusters(opinions, clusterCount) {
@@ -135,8 +137,15 @@ export default function(canvas, centerOn, width, height, scale = 1) {
             finalX: clusterCircleCenter.x + Math.cos((minAngle + (spacing + i * spacing)) * Math.PI / 180) * clusterPositionRadius,
             finalY: clusterCircleCenter.y + Math.sin((minAngle + (spacing + i * spacing)) * Math.PI / 180) * clusterPositionRadius,
             
+            
             // Radius calculated based on the circle packing constant.
             radius: Math.sqrt(citizenArea * res[i].length * 0.9069) / Math.PI * 2
+        }
+        if (CLUSTER_RANDOMLY) {
+            cluster.x = width * Math.random();
+            cluster.y = height * Math.random();
+            cluster.finalX = width * Math.random();
+            cluster.finalY = height * Math.random();
         }
         seatsGiven += cluster.representativeMaxCount;
         clusters.push(cluster);
@@ -151,13 +160,13 @@ export default function(canvas, centerOn, width, height, scale = 1) {
         const cluster = clusters[i];
         for (var j = 0; j < cluster.opinions.length; j++) {
             let citizen = new Citizen(cluster.opinions[j], i, scale, cluster);
-            /*
-            citizen.position.x = -window.innerWidth + Math.random() * (window.innerWidth * 3);
-            citizen.position.y = -window.innerHeight + Math.random() * (window.innerHeight * 3)
-            */
+            
+            citizen.position.x = -width + Math.random() * (width * 3);
+            citizen.position.y = -height + Math.random() * (height * 3)
+            
             let ang = Math.PI * 2 * Math.random();
-            citizen.position.x = clusters[i].x + Math.cos(ang) * (Math.random() * width / 2);
-            citizen.position.y = clusters[i].y + Math.sin(ang) * (Math.random() * height / 2);
+            //citizen.position.x = clusters[i].x + Math.cos(ang) * (Math.random() * width / 2);
+            //citizen.position.y = clusters[i].y + Math.sin(ang) * (Math.random() * height / 2);
             citizen.index = citizens.length;
             citizens.push(citizen);
         }
@@ -399,7 +408,6 @@ function drawCitizenInCtx(clusterId, radius, ctx, offset) {
                 }
             }
             ctx.closePath();
-            ctx.stroke();
             break;
         }
         case 5: {
@@ -456,7 +464,7 @@ function drawCitizenInCtx(clusterId, radius, ctx, offset) {
     /*if (citizen.isAtRest) {
         ctx.fillStyle = citizen.secondsAtRest > 5 ? 'gold' : "black"
     }*/
-    ctx.stroke();
+    SOLID_SHAPES ? ctx.fill() : ctx.stroke();
 }
 
 function createSeatingOrder(simulation) {

@@ -21,13 +21,13 @@ window.initParliamentVisualization = function initParliamentVisualization({
     margin: 0; 
     padding: 0; 
     width: 100%; 
-    height: 100%; 
     position: absolute;
     z-index: ${zIndex}; 
     opacity: ${CANVAS_OPACITY};
     `;
 
     handleOnResize();
+    
     
 
     let start = () => initSimulation(canvas, centerElement, window.innerWidth, height || window.innerHeight, scale);
@@ -38,7 +38,8 @@ window.initParliamentVisualization = function initParliamentVisualization({
     let resizeTimeout = null;
     function handleOnResize() {
         canvas.setAttribute('width', window.innerWidth);
-        canvas.setAttribute('height', window.innerHeight);
+        canvas.setAttribute('height', height || window.innerHeight);
+
         if (warmup <= 0) {
             if (resizeTimeout) {
                 clearTimeout(resizeTimeout)

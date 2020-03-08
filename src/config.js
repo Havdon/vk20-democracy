@@ -2,12 +2,15 @@
 
 export const DRAW_CLUSTER_RADI = false;
 export const DRAW_SEATS = false;
-export const ONLY_CIRCLES = false;
-export const VARIABLE_COLOR = true;
+export const ONLY_CIRCLES = true;
+export const SOLID_SHAPES = true;
+export const VARIABLE_COLOR = false;
+export const CLUSTER_RANDOMLY = true;
+export const FORM_PARLIAMENT = false;
 
-export const CANVAS_OPACITY = VARIABLE_COLOR ? 0.7 : 0.3;
+export const CANVAS_OPACITY = VARIABLE_COLOR ? 0.7 : 1.0;
 
-export const POPULATION_SIZE = 400;
+export const POPULATION_SIZE = 100;
 export const CITIZENS_PER_REP = 10;
 export const PARTY_MAX_SIZE = 0.4;
 
