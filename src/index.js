@@ -2,9 +2,20 @@ import { getCanvas } from './utils'
 import { CANVAS_OPACITY } from './config'
 import initSimulation from './simulation';
 
-function handleOnLoad() {
+window.initParliamentVisualization = function initParliamentVisualization({
+    centerElement, 
+    zIndex = 0,
+    height = null,
+    scale = 1
+}) {
 
-    const canvas = getCanvas();
+    if (!centerElement) {
+        throw new Error(`[initParliamentVisualization] Invalid argument centerElement: ${centerElement}`)
+    }
+
+    let canvas = document.createElement('canvas');
+    document.body.prepend(canvas);
+    
     canvas.style = `
     pointer-events: none; 
     margin: 0; 
@@ -12,32 +23,49 @@ function handleOnLoad() {
     width: 100%; 
     height: 100%; 
     position: absolute;
-    z-index: 6; opacity: ${CANVAS_OPACITY};
+    z-index: ${zIndex}; 
+    opacity: ${CANVAS_OPACITY};
     `;
 
-    let centerOn = canvas.getAttribute('data-center-on');
-    if (centerOn != null) {
-        let result = document.querySelector(centerOn);
-        if (result == null) {
-            throw new Error(`Invalid data-center-on, querySelector returns null for ${centerOn}`);
-        }
-        centerOn = result;
-    }
-
     handleOnResize();
-    initSimulation(canvas, centerOn);
+    
 
+    let start = () => initSimulation(canvas, centerElement, window.innerWidth, height || window.innerHeight, scale);
+    let stop = start();
 
     // Handle window resizing.
+    let warmup = 2;
+    let resizeTimeout = null;
     function handleOnResize() {
         canvas.setAttribute('width', window.innerWidth);
         canvas.setAttribute('height', window.innerHeight);
+        if (warmup <= 0) {
+            if (resizeTimeout) {
+                clearTimeout(resizeTimeout)
+            }
+            resizeTimeout = setTimeout(() => {
+                stop();
+                stop = start();
+            }, 200);
+        } else {
+            warmup--;
+        }
+        
     }
     
     window.onresize = handleOnResize;
+    window.addEventListener('resize', handleOnResize);
+
+    return {
+        canvas,
+        destroy: function() {
+            stop();
+            canvas.parentNode.removeChild(canvas)
+            window.removeEventListener('resize', handleOnResize);
+        }
+    }
 }
 
-window.addEventListener('load', handleOnLoad);
 
 
 

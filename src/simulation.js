@@ -4,7 +4,7 @@ import kmeans from './KMeans'
 import Quadtree from './QuadTree';
 import Citizen from './Citizen'
 import Vec2 from './vec2';
-import { startUpdateLoop, lerp, drawEqTriangle, gaussianRand, shuffle } from './utils'
+import { startUpdateLoop, lerp, drawEqTriangle, gaussianRand, shuffle, distanceToRectEdge } from './utils'
 
 import {
     POPULATION_SIZE,
@@ -21,7 +21,8 @@ import {
     DRAW_SEATS,
     ONLY_CIRCLES,
     VARIABLE_COLOR,
-    PARTY_MAX_SIZE
+    PARTY_MAX_SIZE,
+    FADE_DISTANCE
 } from './config'
 
 function sortIntoClusters(opinions, clusterCount) {
@@ -52,9 +53,7 @@ function sortIntoClusters(opinions, clusterCount) {
     return results;
 }
 
-export default function(canvas, centerOn) {
-
-    let scale = 1;
+export default function(canvas, centerOn, width, height, scale = 1) {
 
     const ctx = canvas.getContext('2d');
 
@@ -65,13 +64,11 @@ export default function(canvas, centerOn) {
         for (var j = 0; j < OPINION_COUNT; j++) {
             opinions.push(-1 + Math.random() * 2);
         }
-        allOpinions.push(opinions);
-
-        
+        allOpinions.push(opinions);   
     }
 
     let parliament = {
-        position: new Vec2(window.innerWidth / 2, window.innerHeight / 2),
+        position: new Vec2(width / 2, height / 2),
         radius: PARLIAMENT_RADIUS * scale
     }
 
@@ -85,8 +82,8 @@ export default function(canvas, centerOn) {
 
     const clusterCount = MIN_CLUSTERS + Math.round(Math.random() * (MAX_CLUSTERS - MIN_CLUSTERS));
 
-    let clusterPositionRadius = window.innerWidth;
-    let clusterCircleCenter = new Vec2(window.innerWidth / 2,
+    let clusterPositionRadius = width;
+    let clusterCircleCenter = new Vec2(width / 2,
         parliament.position.y / 2 + clusterPositionRadius);
     
     if (centerOn) {
@@ -101,14 +98,14 @@ export default function(canvas, centerOn) {
 
 
     // Calculate min + max angles, if t
-    if (window.innerWidth < clusterPositionRadius * 2) {
+    if (width < clusterPositionRadius * 2) {
         let left = new Vec2(
             0, 
             clusterCircleCenter.y - Math.sqrt(clusterPositionRadius * clusterPositionRadius - Math.pow(clusterCircleCenter.x - 0, 2))
         );
         let right = new Vec2(
-            window.innerWidth, 
-            clusterCircleCenter.y - Math.sqrt(clusterPositionRadius * clusterPositionRadius - Math.pow(clusterCircleCenter.x - window.innerWidth, 2))
+            width, 
+            clusterCircleCenter.y - Math.sqrt(clusterPositionRadius * clusterPositionRadius - Math.pow(clusterCircleCenter.x - width, 2))
         );
 
         let dirL = Vec2.sub(clusterCircleCenter, left);
@@ -133,8 +130,8 @@ export default function(canvas, centerOn) {
             timeSinceElection: 0,
             restCount: 0,
             representativeMaxCount: Math.round(res[i].length / CITIZENS_PER_REP),
-            x: clusterCircleCenter.x + Math.cos((minAngle + (spacing + i * spacing)) * Math.PI / 180) * clusterPositionRadius + (-(window.innerWidth / 2) + Math.random() * window.innerWidth),
-            y: clusterCircleCenter.y + Math.sin((minAngle + (spacing + i * spacing)) * Math.PI / 180) * clusterPositionRadius + (-(window.innerHeight / 2) + Math.random() * window.innerHeight),
+            x: clusterCircleCenter.x + Math.cos((minAngle + (spacing + i * spacing)) * Math.PI / 180) * clusterPositionRadius + (-(width / 2) + Math.random() * width),
+            y: clusterCircleCenter.y + Math.sin((minAngle + (spacing + i * spacing)) * Math.PI / 180) * clusterPositionRadius + (-(height / 2) + Math.random() * height),
             finalX: clusterCircleCenter.x + Math.cos((minAngle + (spacing + i * spacing)) * Math.PI / 180) * clusterPositionRadius,
             finalY: clusterCircleCenter.y + Math.sin((minAngle + (spacing + i * spacing)) * Math.PI / 180) * clusterPositionRadius,
             
@@ -159,21 +156,21 @@ export default function(canvas, centerOn) {
             citizen.position.y = -window.innerHeight + Math.random() * (window.innerHeight * 3)
             */
             let ang = Math.PI * 2 * Math.random();
-            citizen.position.x = clusters[i].x + Math.cos(ang) * (Math.random() * window.innerWidth / 2);
-            citizen.position.y = clusters[i].y + Math.sin(ang) * (Math.random() * window.innerWidth / 2);
+            citizen.position.x = clusters[i].x + Math.cos(ang) * (Math.random() * width / 2);
+            citizen.position.y = clusters[i].y + Math.sin(ang) * (Math.random() * height / 2);
             citizen.index = citizens.length;
             citizens.push(citizen);
         }
     }
-    
-    console.log(citizens)
 
     const simulation = {
         citizens,
         clusters,
         parliament,
         clusterPositionRadius,
-        clusterCircleCenter
+        clusterCircleCenter,
+        width, 
+        height
     }
 
     simulation.parliament.seats = createSeatingOrder(simulation);
@@ -184,17 +181,21 @@ export default function(canvas, centerOn) {
         ix += cluster.representativeMaxCount;
     }
 
-    startUpdateLoop(dt => update(simulation, dt), () => render(canvas, ctx, simulation));    
+    let stopUpdate = startUpdateLoop(dt => update(simulation, dt), () => render(canvas, ctx, simulation));    
+
+    return function() {
+        stopUpdate();
+    }
 }
 
 function update(simulation, dt) {
-    const { citizens, clusters } = simulation;
+    const { citizens, clusters, width, height } = simulation;
     const maxOpinionDifference = OPINION_COUNT * 2;
     let quadTree = new Quadtree({
-        x: -window.innerWidth,
-        y: -window.innerHeight,
-        width: window.innerWidth * 3,
-        height: window.innerHeight * 3
+        x: -width,
+        y: -height,
+        width: width * 3,
+        height: height * 3
     }, 20, 10);
     for (var i = 0; i < citizens.length; i++) {
         let citizen = citizens[i];
@@ -257,7 +258,9 @@ function render(canvas, ctx, simulation) {
         clusters, 
         parliament,
         clusterPositionRadius,
-        clusterCircleCenter } = simulation;
+        clusterCircleCenter,
+        width,
+        height } = simulation;
 
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -286,6 +289,12 @@ function render(canvas, ctx, simulation) {
     ctx.lineWidth = 2;
     citizens.forEach((citizen) => {
         let { position, clusterId, radius, col } = citizen;
+
+        let distToEdge = distanceToRectEdge(0, 0, width, height, position.x, position.y);
+        if (distToEdge < 0) distToEdge = 0;
+        let edgeFade = distToEdge < FADE_DISTANCE ? (distToEdge / FADE_DISTANCE) : 1;
+        
+
         if (VARIABLE_COLOR) {
             let color = 220 - (220 * citizen.opacity);
             if (!citizen.isNormal()) color = 0;
@@ -297,7 +306,7 @@ function render(canvas, ctx, simulation) {
             ctx.save();
             if (VARIABLE_COLOR) {
                // let distToMid = 0.2 * 0.8 * Math.abs(citizen.position.x - window.innerWidth / 2) / (window.innerWidth / 2)
-                ctx.globalAlpha = 0.1 + (citizen.opacity * 0.9);// * distToMid;
+                ctx.globalAlpha = (0.1 + (citizen.opacity * 0.9)) * edgeFade;// * distToMid;
             }
             ctx.drawImage(canvas, position.x - canvas.width / 2, position.y - canvas.height / 2);
             ctx.restore();

@@ -23,7 +23,9 @@ export function startUpdateLoop(updateFn, renderFn) {
     const maxFPS = 60;
     let timestep = 1000 / 60;
     let delta = 0;
+    let running = true;
     function mainLoop() {
+        if (!running) return;
         var timestamp = Date.now();
         // Throttle the frame rate
         if (timestamp < lastFrameTimeMs + (1000 / maxFPS)) {
@@ -46,9 +48,14 @@ export function startUpdateLoop(updateFn, renderFn) {
             }
         }
         renderFn();
-        window.requestAnimationFrame(mainLoop);
+        
+        window.requestAnimationFrame(mainLoop); 
     }
     window.requestAnimationFrame(mainLoop);
+
+    return function() {
+        running = false;
+    }
 }
 
 export function lerp(v0, v1, t) {
@@ -108,3 +115,13 @@ export function shuffle(array) {
   
     return array;
   }
+
+export function distanceToRectEdge(rx, ry, rw, rh, px, py) {
+    px -= rx;
+    py -= ry;
+    let left = px;
+    let right = rw - px;
+    let top = py;
+    let bottom = rh - py;
+    return Math.min(bottom, Math.min(right, Math.min(top, left)))
+}

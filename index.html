@@ -44,7 +44,6 @@
 </head>
 
 <body>
-    <canvas id="vk20-democracy-canvas" data-center-on=".css-1n1c6cf > video"></canvas>
     <div id="__next">
         <style data-emotion-css="nefbsr">
             .css-1nbrgf1, .css-vwak8v {
@@ -582,7 +581,7 @@
                     }
                 </style>
                 <div class="css-1n1c6cf">
-                    <video width="100%" height="auto" muted="" loop="" autoplay="" playsinline="">
+                    <video  width="100%" height="auto" muted="" loop="" autoplay="" playsinline="">
                         <source src="logo_anim_2.mp4" type="video/mp4" />Your browser does not support the video
                         tag.</video></div>
             </div>
@@ -1415,6 +1414,13 @@
     <script src="_next/static/runtime/main-37d7464045526570acb7.js" async=""></script>
     <script src="_next/static/xiFeuWSmRMmA7ZVOTJ3XX/_buildManifest.js" async=""></script>
 </body>
-<script src="public/bundle.js"></script>
-
+<script src="public/vk20-visualization.min.js"></script>
+<script>
+    window.addEventListener('load', () => {
+        var result = initParliamentVisualization({
+            centerElement: document.querySelector(".css-1n1c6cf > video"), 
+            zIndex: 6
+        })
+    });
+</script>
 </html>

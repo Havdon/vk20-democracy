@@ -55,3 +55,6 @@ export const VELOCITY_HISTORY_LENGTH = 10;
 
 // Avg velocity over history has to be below this for a citizen to be asleep.
 export const STILLNESS_LIMIT = 0.01;
+
+// Distance from edge of canvas where fadein happens.
+export const FADE_DISTANCE = 20;
