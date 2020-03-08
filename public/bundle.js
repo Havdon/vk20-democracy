@@ -137,7 +137,7 @@
   const MIN_ELECTORATE_SIZE = 0.7;
 
   // Max speed anyone can move.
-  const SPEED_LIMIT = 0.1;
+  const SPEED_LIMIT = 0.01;
 
   const AIR_FRICTION = 0.8;
 
@@ -1126,10 +1126,6 @@
 
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      ctx.beginPath();
-      ctx.arc(clusterCircleCenter.x, clusterCircleCenter.y, clusterPositionRadius, 0, 2 * Math.PI);
-      ctx.stroke();
       
       ctx.lineWidth = 2;
       citizens.forEach((citizen) => {

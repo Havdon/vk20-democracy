@@ -46,7 +46,7 @@ export const TIME_BETWEEN_ELECTIONS = 12;
 export const MIN_ELECTORATE_SIZE = 0.7;
 
 // Max speed anyone can move.
-export const SPEED_LIMIT = 0.1;
+export const SPEED_LIMIT = 0.01;
 
 export const AIR_FRICTION = 0.8;
 

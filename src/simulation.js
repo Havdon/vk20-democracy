@@ -269,10 +269,10 @@ function render(canvas, ctx, simulation) {
             ctx.stroke();
         }
     }
-
+/*
     ctx.beginPath();
     ctx.arc(clusterCircleCenter.x, clusterCircleCenter.y, clusterPositionRadius, 0, 2 * Math.PI);
-    ctx.stroke();
+    ctx.stroke();*/
 
     //ctx.globalAlpha = 0.3
     if (DRAW_SEATS) {
