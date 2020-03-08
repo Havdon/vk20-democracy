@@ -26,8 +26,8 @@ window.initParliamentVisualization = function initParliamentVisualization({
     opacity: ${CANVAS_OPACITY};
     `;
 
-    handleOnResize();
     
+    handleOnResize();
     
 
     let start = () => initSimulation(canvas, centerElement, window.innerWidth, height || window.innerHeight, scale);
@@ -36,11 +36,20 @@ window.initParliamentVisualization = function initParliamentVisualization({
     // Handle window resizing.
     let warmup = 2;
     let resizeTimeout = null;
+    let w = 0;
+    let h = 0;
     function handleOnResize() {
-        canvas.setAttribute('width', window.innerWidth);
-        canvas.setAttribute('height', height || window.innerHeight);
+        console.log('resize')
+        var pageHeight = Math.max(document.body.scrollHeight, document.body.offsetHeight, 
+            document.documentElement.clientHeight, document.documentElement.scrollHeight, document.documentElement.offsetHeight );
 
-        if (warmup <= 0) {
+        let newW = window.innerWidth;
+        let newH = height || pageHeight;
+        if (newW != w || newH != h) {
+            canvas.setAttribute('width', newW);
+            canvas.setAttribute('height', newH);
+            w = newW;
+            h = newH;
             if (resizeTimeout) {
                 clearTimeout(resizeTimeout)
             }
@@ -48,8 +57,6 @@ window.initParliamentVisualization = function initParliamentVisualization({
                 stop();
                 stop = start();
             }, 200);
-        } else {
-            warmup--;
         }
         
     }
