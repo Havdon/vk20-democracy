@@ -13,7 +13,7 @@ Parameters:
         {
             centerElement - Element which center point the parliament should gather around
             zIndex - The z-index of the canvas (Optional, default: 0)
-            height - The height of the canvas (Optional, default: window.innerHeight)
+            height - The height of the canvas (Optional, default: page height)
             scale - Scaling number of the simulation (Optional, default: 1)
         }
 
@@ -36,5 +36,4 @@ Return:
 ```
 
 ### NOTEs:
-- Do not initialize the simulation of mobile devices.
 - The simulation restarts if the window is resized.

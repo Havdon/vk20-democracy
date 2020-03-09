@@ -26,21 +26,23 @@ window.initParliamentVisualization = function initParliamentVisualization({
     opacity: ${CANVAS_OPACITY};
     `;
 
-    
+    let isInitial = true;
     handleOnResize();
     
+    let pageHeight = Math.max(document.body.scrollHeight, document.body.offsetHeight, 
+        document.documentElement.clientHeight, document.documentElement.scrollHeight, document.documentElement.offsetHeight );
 
-    let start = () => initSimulation(canvas, centerElement, window.innerWidth, height || window.innerHeight, scale);
+    let start = () => initSimulation(canvas, centerElement, window.innerWidth, height || pageHeight, scale);
     let stop = start();
 
     // Handle window resizing.
-    let warmup = 2;
+    
     let resizeTimeout = null;
     let w = 0;
     let h = 0;
     function handleOnResize() {
-        console.log('resize')
-        var pageHeight = Math.max(document.body.scrollHeight, document.body.offsetHeight, 
+        
+        pageHeight = Math.max(document.body.scrollHeight, document.body.offsetHeight, 
             document.documentElement.clientHeight, document.documentElement.scrollHeight, document.documentElement.offsetHeight );
 
         let newW = window.innerWidth;
@@ -50,18 +52,20 @@ window.initParliamentVisualization = function initParliamentVisualization({
             canvas.setAttribute('height', newH);
             w = newW;
             h = newH;
-            if (resizeTimeout) {
-                clearTimeout(resizeTimeout)
+            if (!isInitial) {
+                if (resizeTimeout) {
+                    clearTimeout(resizeTimeout)
+                }
+                resizeTimeout = setTimeout(() => {
+                    stop();
+                    stop = start();
+                }, 200);
             }
-            resizeTimeout = setTimeout(() => {
-                stop();
-                stop = start();
-            }, 200);
+            isInitial = false;
         }
         
     }
     
-    window.onresize = handleOnResize;
     window.addEventListener('resize', handleOnResize);
 
     return {

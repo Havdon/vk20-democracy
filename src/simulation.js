@@ -162,7 +162,7 @@ export default function(canvas, centerOn, width, height, scale = 1) {
             let citizen = new Citizen(cluster.opinions[j], i, scale, cluster);
             
             citizen.position.x = -width + Math.random() * (width * 3);
-            citizen.position.y = -height + Math.random() * (height * 3)
+            citizen.position.y = Math.random() * (height)
             
             let ang = Math.PI * 2 * Math.random();
             //citizen.position.x = clusters[i].x + Math.cos(ang) * (Math.random() * width / 2);
