@@ -2,15 +2,16 @@
 
 export const DRAW_CLUSTER_RADI = false;
 export const DRAW_SEATS = false;
-export const ONLY_CIRCLES = true;
-export const SOLID_SHAPES = true;
-export const VARIABLE_COLOR = false;
-export const CLUSTER_RANDOMLY = true;
-export const FORM_PARLIAMENT = false;
+export const ONLY_CIRCLES = false;
+export const SOLID_SHAPES = false;
+export const VARIABLE_COLOR = true;
+export const CLUSTER_RANDOMLY = false;
+export const FORM_PARLIAMENT = true;
+export const FULL_HEIGHT_SPAWN = false;
 
 export const CANVAS_OPACITY = VARIABLE_COLOR ? 0.7 : 1.0;
 
-export const POPULATION_SIZE = 100;
+export const POPULATION_SIZE = 200;
 export const CITIZENS_PER_REP = 10;
 export const PARTY_MAX_SIZE = 0.4;
 
@@ -49,7 +50,7 @@ export const TIME_BETWEEN_ELECTIONS = 12;
 export const MIN_ELECTORATE_SIZE = 0.7;
 
 // Max speed anyone can move.
-export const SPEED_LIMIT = 0.01;
+export const SPEED_LIMIT = 0.2;
 
 export const AIR_FRICTION = 0.8;
 

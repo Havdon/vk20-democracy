@@ -20,7 +20,6 @@ module.exports = {
             babelrc: false,
             presets: [["@babel/preset-env"]]
         }),
-       // serve()
-        uglify()
+        serve()
     ]
   };

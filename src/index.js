@@ -1,5 +1,5 @@
 import { getCanvas } from './utils'
-import { CANVAS_OPACITY } from './config'
+import { CANVAS_OPACITY, FULL_HEIGHT_SPAWN } from './config'
 import initSimulation from './simulation';
 
 window.initParliamentVisualization = function initParliamentVisualization({
@@ -26,11 +26,16 @@ window.initParliamentVisualization = function initParliamentVisualization({
     opacity: ${CANVAS_OPACITY};
     `;
 
+    let getHeight = () => FULL_HEIGHT_SPAWN ? 
+        Math.max(document.body.scrollHeight, document.body.offsetHeight, document.documentElement.clientHeight, document.documentElement.scrollHeight, document.documentElement.offsetHeight ) 
+        : document.clientHeight;
+
     let isInitial = true;
     handleOnResize();
+
     
-    let pageHeight = Math.max(document.body.scrollHeight, document.body.offsetHeight, 
-        document.documentElement.clientHeight, document.documentElement.scrollHeight, document.documentElement.offsetHeight );
+    
+    let pageHeight = getHeight();
 
     let start = () => initSimulation(canvas, centerElement, window.innerWidth, height || pageHeight, scale);
     let stop = start();
@@ -42,8 +47,7 @@ window.initParliamentVisualization = function initParliamentVisualization({
     let h = 0;
     function handleOnResize() {
         
-        pageHeight = Math.max(document.body.scrollHeight, document.body.offsetHeight, 
-            document.documentElement.clientHeight, document.documentElement.scrollHeight, document.documentElement.offsetHeight );
+        pageHeight = getHeight();
 
         let newW = window.innerWidth;
         let newH = height || pageHeight;
