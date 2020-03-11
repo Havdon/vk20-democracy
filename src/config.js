@@ -11,7 +11,7 @@ export const FULL_HEIGHT_SPAWN = false;
 
 export const CANVAS_OPACITY = VARIABLE_COLOR ? 0.7 : 1.0;
 
-export const POPULATION_SIZE = 200;
+export const POPULATION_SIZE = 300;
 export const CITIZENS_PER_REP = 10;
 export const PARTY_MAX_SIZE = 0.4;
 
